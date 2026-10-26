@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# A new push to the same branch cancels the run that is still going
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least privilege: CI only needs to read the code
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    # This name becomes the required status check, so keep it stable
+    name: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      HUSKY: 0 # no git hooks on CI machines
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # pnpm must exist before setup-node, so setup-node can cache pnpm's store
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Generates expo-env.d.ts and the typed routes (gitignored, so missing on a fresh clone)
+      - name: Generate Expo types
+        run: pnpm exec expo customize tsconfig.json
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Check formatting
+        run: pnpm format:check
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Expo Doctor
+        run: pnpm dlx expo-doctor@latest
