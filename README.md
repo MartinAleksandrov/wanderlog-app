@@ -28,6 +28,8 @@ pnpm start     # starts the Metro dev server; press "a" to open Android
 | `pnpm format:check` | Check formatting without writing                      |
 | `pnpm check`        | Lint + typecheck + format check (what CI runs)        |
 | `pnpm fix`          | Format and auto-fix lint issues                       |
+| `pnpm doctor:react` | React Doctor: React anti-patterns, a11y, security     |
+| `pnpm doctor:expo`  | Expo Doctor: SDK compatibility of dependencies/config |
 
 Add dependencies with `npx expo install <package>` so versions match the Expo SDK.
 Use `pnpm add -D` only for dev tools unrelated to React Native.
@@ -55,7 +57,7 @@ Native `android/` and `ios/` folders are generated from `app.json` and are not c
   - **pre-commit**: ESLint and Prettier on staged files
   - **commit-msg**: commitlint
   - **pre-push**: typecheck
-- CI (GitHub Actions) runs lint, format check, typecheck and Expo Doctor on every PR.
+- CI (GitHub Actions) runs lint, format check, typecheck, React Doctor and Expo Doctor on every PR.
 
 ## License
 

@@ -53,5 +53,8 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: React Doctor
+        run: pnpm doctor:react
+
       - name: Expo Doctor
-        run: pnpm dlx expo-doctor@latest
+        run: pnpm doctor:expo
