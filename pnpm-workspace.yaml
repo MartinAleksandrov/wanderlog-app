@@ -1,1 +1,6 @@
 nodeLinker: hoisted
+
+# pnpm 10 blocks dependency install scripts unless approved.
+# unrs-resolver's script only re-checks its prebuilt native binary; ESLint works without it.
+ignoredBuiltDependencies:
+  - unrs-resolver
