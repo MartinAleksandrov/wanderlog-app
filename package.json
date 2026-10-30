@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "packageManager": "pnpm@10.28.0",
   "dependencies": {
+    "convex": "^1.48.0",
     "expo": "~57.0.30",
     "expo-constants": "~57.0.22",
     "expo-font": "~57.0.4",
@@ -46,7 +47,8 @@
     "fix": "pnpm format && pnpm lint --fix",
     "prepare": "husky",
     "doctor:react": "react-doctor --no-telemetry --yes",
-    "doctor:expo": "pnpm dlx expo-doctor@latest"
+    "doctor:expo": "pnpm dlx expo-doctor@latest",
+    "db": "npx convex dev"
   },
   "private": true
 }
