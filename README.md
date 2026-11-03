@@ -15,6 +15,19 @@ Built with React Native, Expo (SDK 57), Expo Router and TypeScript.
 pnpm install   # installs dependencies and sets up git hooks
 pnpm start     # starts the Metro dev server; press "a" to open Android
 ```
+```powershell
+# Export Netskope's root certificate from the Windows trust store (PowerShell, repo root)
+New-Item -ItemType Directory -Force certs | Out-Null
+$cert = Get-ChildItem Cert:\LocalMachine\Root | Where-Object Subject -Match 'netskope' | Select-Object -First 1
+$base64 = [Convert]::ToBase64String($cert.RawData, 'InsertLineBreaks') -replace "`r", ''
+[IO.File]::WriteAllText("$PWD\certs\netskope_root.pem", "-----BEGIN CERTIFICATE-----`n$base64`n-----END CERTIFICATE-----`n")
+
+npx expo prebuild --clean -p android   # regenerate android/ with the certificate
+npx expo run:android                   # build and install the debug app
+```
+
+This needs a native debug build: Expo Go is a prebuilt app with its own trust settings. Release
+builds are never affected. To turn it off, delete the file and run the prebuild command again.
 
 ## Scripts
 
