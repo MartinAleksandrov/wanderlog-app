@@ -42,6 +42,12 @@ example
 /ios
 /android
 
+# Local-only TLS-inspection root (Netskope) for debug builds; see plugins/withNetskopeDebugTrust.js
+/certs/
+
 # Claude Code (local, private)
 CLAUDE.local.md
 .claude/settings.local.json
+
+# Local-only debug trust plugin for Netskope
+plugins/withNetskopeDebugTrust.js
