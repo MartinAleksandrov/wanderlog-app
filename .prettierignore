@@ -3,6 +3,7 @@ node_modules
 dist
 pnpm-lock.yaml
 expo-env.d.ts
+src/uniwind-types.d.ts
 AGENTS.md 
 README.md
 .assets

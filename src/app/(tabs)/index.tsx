@@ -1,17 +1,12 @@
-import { Text, View, StyleSheet } from 'react-native';
+import { Text, View } from 'react-native';
 
-export default function Index() {
+// Temporary screen to prove Uniwind works: plain React Native components styled with Tailwind classes.
+// It gets replaced when the login and trips screens arrive.
+export default function TripsScreen() {
   return (
-    <View style={styles.container}>
-      <Text>Edit src/app/index.tsx to edit this screen.</Text>
+    <View className="flex-1 items-center justify-center gap-2 bg-sky-50">
+      <Text className="text-3xl font-bold text-sky-900">Wanderlog</Text>
+      <Text className="text-base text-sky-700">Styled with Uniwind</Text>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});

@@ -7,6 +7,6 @@ module.exports = defineConfig([
   expoConfig,
   prettierRecommended,
   {
-    ignores: ['dist/*', '.expo/*', 'expo-env.d.ts'],
+    ignores: ['dist/*', '.expo/*', 'expo-env.d.ts', 'src/uniwind-types.d.ts'],
   },
 ]);
