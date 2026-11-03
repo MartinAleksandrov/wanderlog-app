@@ -48,6 +48,3 @@ example
 # Claude Code (local, private)
 CLAUDE.local.md
 .claude/settings.local.json
-
-# Local-only debug trust plugin for Netskope
-plugins/withNetskopeDebugTrust.js
