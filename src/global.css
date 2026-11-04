@@ -1,0 +1,88 @@
+@import 'tailwindcss';
+@import 'uniwind';
+@import 'tw-animate-css';
+
+/* Design tokens shared by every component: corner radius sizes and a 1-pixel border width */
+@theme {
+  --radius: 10px;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --spacing-hairline: hairlineWidth();
+}
+
+/* Registers the palette's color names with Tailwind, so tools that don't run Metro (Prettier's
+   class sorting in CI, fresh clones) know bg-primary, text-muted-foreground etc. are real classes.
+   Uniwind generates the same block at Metro start; the actual values come from the variants below.
+   When adding a color, add it here and in both the light and dark sets. */
+@theme {
+  --color-background: unset;
+  --color-foreground: unset;
+  --color-card: unset;
+  --color-card-foreground: unset;
+  --color-popover: unset;
+  --color-popover-foreground: unset;
+  --color-primary: unset;
+  --color-primary-foreground: unset;
+  --color-secondary: unset;
+  --color-secondary-foreground: unset;
+  --color-muted: unset;
+  --color-muted-foreground: unset;
+  --color-accent: unset;
+  --color-accent-foreground: unset;
+  --color-destructive: unset;
+  --color-border: unset;
+  --color-input: unset;
+  --color-ring: unset;
+}
+
+/* The color palette (React Native Reusables defaults). Components use names like bg-primary or
+   text-muted-foreground, never raw colors, so the whole app is re-themed by editing these values.
+   Uniwind switches between the light and dark sets automatically with the phone's setting. */
+@layer theme {
+  :root {
+    @variant light {
+      --color-background: oklch(1 0 0);
+      --color-foreground: oklch(0.145 0 0);
+      --color-card: oklch(1 0 0);
+      --color-card-foreground: oklch(0.145 0 0);
+      --color-popover: oklch(1 0 0);
+      --color-popover-foreground: oklch(0.145 0 0);
+      --color-primary: oklch(0.205 0 0);
+      --color-primary-foreground: oklch(0.985 0 0);
+      --color-secondary: oklch(0.97 0 0);
+      --color-secondary-foreground: oklch(0.205 0 0);
+      --color-muted: oklch(0.97 0 0);
+      --color-muted-foreground: oklch(0.556 0 0);
+      --color-accent: oklch(0.97 0 0);
+      --color-accent-foreground: oklch(0.205 0 0);
+      --color-destructive: oklch(0.577 0.245 27.325);
+      --color-border: oklch(0.922 0 0);
+      --color-input: oklch(0.922 0 0);
+      --color-ring: oklch(0.708 0 0);
+    }
+
+    @variant dark {
+      --color-background: oklch(0.145 0 0);
+      --color-foreground: oklch(0.985 0 0);
+      --color-card: oklch(0.205 0 0);
+      --color-card-foreground: oklch(0.985 0 0);
+      --color-popover: oklch(0.205 0 0);
+      --color-popover-foreground: oklch(0.985 0 0);
+      --color-primary: oklch(0.922 0 0);
+      --color-primary-foreground: oklch(0.205 0 0);
+      --color-secondary: oklch(0.269 0 0);
+      --color-secondary-foreground: oklch(0.985 0 0);
+      --color-muted: oklch(0.269 0 0);
+      --color-muted-foreground: oklch(0.708 0 0);
+      --color-accent: oklch(0.269 0 0);
+      --color-accent-foreground: oklch(0.985 0 0);
+      --color-destructive: oklch(0.704 0.191 22.216);
+      --color-border: oklch(1 0 0 / 10%);
+      --color-input: oklch(1 0 0 / 15%);
+      --color-ring: oklch(0.556 0 0);
+    }
+  }
+}
