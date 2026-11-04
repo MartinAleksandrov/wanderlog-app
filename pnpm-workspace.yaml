@@ -4,3 +4,9 @@ nodeLinker: hoisted
 # unrs-resolver's script only re-checks its prebuilt native binary; ESLint works without it.
 ignoredBuiltDependencies:
   - unrs-resolver
+
+# @rn-primitives packages list react-native-web as a peer for their web build only.
+# This app is Android-only and never loads it, so don't warn about it being missing.
+peerDependencyRules:
+  ignoreMissing:
+    - react-native-web
