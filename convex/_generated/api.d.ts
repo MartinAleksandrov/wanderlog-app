@@ -9,11 +9,13 @@
  */
 
 import type * as functions from '../functions.js';
+import type * as users from '../users.js';
 
 import type { ApiFromModules, FilterApi, FunctionReference } from 'convex/server';
 
 declare const fullApi: ApiFromModules<{
   functions: typeof functions;
+  users: typeof users;
 }>;
 
 /**

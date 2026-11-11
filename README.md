@@ -9,6 +9,23 @@ Built with React Native, Expo (SDK 57), Expo Router and TypeScript.
 - pnpm 10 (version pinned in `package.json` → `packageManager`)
 - Android Studio with an emulator, or a phone with [Expo Go](https://expo.dev/go)
 
+## Environment and accounts
+
+The app needs a [Clerk](https://clerk.com) application (sign-in) and a [Convex](https://convex.dev)
+deployment (backend). Create `.env.local` in the repo root (gitignored):
+
+```bash
+EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...   # Clerk dashboard → API keys
+EXPO_PUBLIC_CONVEX_URL=https://....convex.cloud # written by `npx convex dev`
+```
+
+Convex must also trust Clerk's tokens: activate the Convex integration in the Clerk dashboard,
+then set its Frontend API URL on the Convex deployment:
+
+```bash
+npx convex env set CLERK_JWT_ISSUER_DOMAIN https://<your-app>.clerk.accounts.dev
+```
+
 ## Getting started
 
 ```bash
@@ -35,6 +52,7 @@ builds are never affected. To turn it off, delete the file and run the prebuild 
 | ------------------- | ----------------------------------------------------- |
 | `pnpm start`        | Start the dev server                                  |
 | `pnpm android`      | Start the dev server and open the Android emulator    |
+| `pnpm stop`         | Stop the Android emulator and the dev server (Metro)  |
 | `pnpm lint`         | ESLint (warnings fail)                                |
 | `pnpm typecheck`    | TypeScript check (`tsc --noEmit`)                     |
 | `pnpm format`       | Format all files with Prettier                        |

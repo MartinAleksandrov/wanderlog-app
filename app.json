@@ -30,7 +30,9 @@
           "imageWidth": 76
         }
       ],
-      "./plugins/withNetskopeDebugTrust"
+      "./plugins/withNetskopeDebugTrust",
+      "@clerk/expo",
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,
