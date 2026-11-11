@@ -5,6 +5,7 @@
   "packageManager": "pnpm@10.28.0",
   "dependencies": {
     "@clerk/expo": "^4.15.1",
+    "@expo/metro-runtime": "~57.0.18",
     "@rn-primitives/label": "^1.5.2",
     "@rn-primitives/portal": "^1.5.3",
     "@rn-primitives/separator": "^1.5.2",
