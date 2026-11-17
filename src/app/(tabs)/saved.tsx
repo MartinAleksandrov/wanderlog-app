@@ -1,13 +1,11 @@
-import { useQuery } from 'convex/react';
-import { Text, View } from 'react-native';
-import { api } from '../../../convex/_generated/api';
+import { Text } from '@/components/ui/text';
+import { View } from 'react-native';
 
-export default function Saved() {
-  const data = useQuery(api.functions.myQuery);
-
+// Placeholder until the saved places feature is built on the `places` table.
+export default function SavedScreen() {
   return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-      <Text>{data?.[0]?.name}</Text>
+    <View className="flex-1 items-center justify-center bg-background p-6">
+      <Text variant="muted">Saved places are coming soon</Text>
     </View>
   );
 }

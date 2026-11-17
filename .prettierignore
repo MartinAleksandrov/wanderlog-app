@@ -4,6 +4,7 @@ dist
 pnpm-lock.yaml
 expo-env.d.ts
 src/uniwind-types.d.ts
+convex/_generated
 AGENTS.md 
 README.md
 .assets
