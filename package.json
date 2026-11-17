@@ -64,7 +64,7 @@
     "fix": "pnpm format && pnpm lint --fix",
     "prepare": "husky",
     "doctor:react": "react-doctor --no-telemetry --yes",
-    "doctor:expo": "pnpm dlx expo-doctor@latest",
+    "doctor:expo": "node scripts/expo-doctor.js",
     "db": "npx convex dev"
   },
   "private": true

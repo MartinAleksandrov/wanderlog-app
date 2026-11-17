@@ -60,7 +60,7 @@ builds are never affected. To turn it off, delete the file and run the prebuild 
 | `pnpm check`        | Lint + typecheck + format check (what CI runs)        |
 | `pnpm fix`          | Format and auto-fix lint issues                       |
 | `pnpm doctor:react` | React Doctor: React anti-patterns, a11y, security     |
-| `pnpm doctor:expo`  | Expo Doctor: SDK compatibility of dependencies/config |
+| `pnpm doctor:expo`  | Expo Doctor; versions checked against installed SDK   |
 
 Add dependencies with `npx expo install <package>` so versions match the Expo SDK.
 Use `pnpm add -D` only for dev tools unrelated to React Native.
