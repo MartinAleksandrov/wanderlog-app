@@ -3,33 +3,56 @@ import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { NoTripState } from '@/features/trips';
 import { errorMessage } from '@/lib/error-message';
+import { useMyLocation } from '@/lib/my-location';
+import { useNow } from '@/lib/use-now';
 import { cn } from '@/lib/utils';
 import type { Doc } from '@convex/_generated/dataModel';
 import type { SuggestedPlace } from '@convex/googlePlaces';
 import { useRouter } from 'expo-router';
-import { ExpandIcon } from 'lucide-react-native';
+import { ExpandIcon, NavigationIcon } from 'lucide-react-native';
 import { ActivityIndicator, Pressable, SectionList, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { CrawlCard } from './components/crawl-card';
 import { FilterChips } from './components/filter-chips';
+import type { CrawlSpot } from './crawl';
+import { LocationPrompt } from './components/location-prompt';
 import { ModeSwitch } from './components/mode-switch';
 import { PlaceCard, type PlaceInfo } from './components/place-card';
+import { isOpen, openStatus, type OpenStatus } from './open-status';
+import { passesFilters } from './place-filters';
 import { usePlaceMode } from './place-mode-context';
-import { matchesFilter, type PlaceMode } from './place-modes';
+import type { PlaceMode } from './place-modes';
 import { FEW_PLACES, widerSearchArea } from './map-area';
 import { useTripPlaces } from './trip-places';
+import { useDistanceTo } from './use-distance';
 import { usePlaceActions } from './use-place-actions';
 
-// One card: what to show, plus the saved row and/or the Google suggestion behind it
-type Row = { key: string; info: PlaceInfo; saved?: Doc<'places'>; suggestion?: SuggestedPlace };
+// One card: what to show, plus the saved row and/or the Google suggestion behind it, whether
+// it's open now, and how far it is from the phone (metres, when known)
+type Row = {
+  key: string;
+  info: PlaceInfo;
+  saved?: Doc<'places'>;
+  suggestion?: SuggestedPlace;
+  category?: string;
+  status: OpenStatus | null;
+  isOpen: boolean;
+  distance?: number;
+};
 
 // The third tab: the same places as the map, as a list with photos and details, for the side
-// switched on at the top (sights or sweet spots) and the filter chip picked (shared with the
-// map). Saved ones first, then the suggestions that aren't saved yet.
+// switched on at the top (sights or sweet spots) and the filters picked (kind and "Open now",
+// shared with the map). Saved ones first, then the suggestions that aren't saved yet. In the
+// city, each card says how far away it is and both lists go closest first; otherwise Google's
+// order (most popular first).
 export function PlacesScreen() {
   const router = useRouter();
-  const { mode, setKind, filter, setFilterId } = usePlaceMode();
+  const { mode, setKind, filter, setFilterId, openNow, setOpenNow } = usePlaceMode();
   const { trip, area, saved, suggestions, searchArea } = useTripPlaces();
   const { add, confirmRemove } = usePlaceActions(trip?._id, mode.kind);
+  const location = useMyLocation();
+  const distanceTo = useDistanceTo(area);
+  const now = useNow();
 
   // The pop-up with more details. Name and photo go along so its top shows at once, and the
   // side, so its button saves to the same list.
@@ -58,25 +81,23 @@ export function PlacesScreen() {
     );
   }
 
-  const suggestionById = new Map(suggestions.data?.map((place) => [place.providerPlaceId, place]));
-  const savedIds = new Set(saved?.map((place) => place.providerPlaceId));
-  const savedRows = (saved ?? []).map((place): Row => {
-    const suggestion = place.providerPlaceId
-      ? suggestionById.get(place.providerPlaceId)
-      : undefined;
-    // Prefer the fresh Google details (rating, description) when the place is nearby
-    return { key: place._id, info: suggestion ?? place, saved: place, suggestion };
-  });
-  const suggestedRows = (suggestions.data ?? [])
-    .filter((place) => !savedIds.has(place.providerPlaceId))
-    .map((place): Row => ({ key: place.providerPlaceId, info: place, suggestion: place }));
-  // The filter chip picked (Coffee, Parks…); places without a category only show under All
-  const isShown = (row: Row) => filter === null || matchesFilter(row.info.category, filter);
+  const { savedRows, suggestedRows } = toRows(saved ?? [], suggestions.data ?? [], now);
+  const filters = { filter, openNow };
+  // Closest first when distances are known; otherwise Google's order
+  const inOrder = (rows: Row[]) => {
+    const shown = rows.filter((row) => passesFilters(row, filters));
+    if (distanceTo === null) return shown;
+    return shown
+      .map((row) => ({ ...row, distance: distanceTo(row.info.coordinates) }))
+      .sort((a, b) => a.distance - b.distance);
+  };
+  const savedShown = inOrder(savedRows);
   const sections = [
-    { title: mode.savedTitle, data: savedRows.filter(isShown) },
-    { title: mode.suggestedTitle, data: suggestedRows.filter(isShown) },
+    { title: mode.savedTitle, data: savedShown },
+    { title: mode.suggestedTitle, data: inOrder(suggestedRows) },
   ].filter((section) => section.data.length > 0);
   const widerArea = area ? widerSearchArea(area) : null;
+  const isInCity = distanceTo !== null;
 
   return (
     <View className="flex-1 bg-background">
@@ -90,27 +111,46 @@ export function PlacesScreen() {
             <View className="gap-3 pt-4">
               <ModeSwitch kind={mode.kind} onChange={setKind} />
               <ModeBanner mode={mode} destination={trip.destination} />
+              {location.access === 'ask' ? <LocationPrompt onPress={location.enable} /> : null}
               <FilterChips
                 mode={mode}
-                categories={[...savedRows, ...suggestedRows].map((row) => row.info.category)}
-                selected={filter}
+                places={[...savedRows, ...suggestedRows]}
+                filters={filters}
                 onSelect={setFilterId}
+                onOpenNowChange={setOpenNow}
                 // Full width, so the chips scroll from edge to edge
                 className="-mx-4"
                 contentClassName="px-4 py-1"
               />
+              {mode.kind === 'sweet' ? (
+                <CrawlCard
+                  mode={mode}
+                  spots={crawlSpots(savedShown, isInCity)}
+                  start={isInCity ? location.coords : null}
+                />
+              ) : null}
             </View>
           }
           renderSectionHeader={({ section }) => (
-            <Text className="pt-3 text-sm font-semibold text-muted-foreground uppercase">
-              {section.title}
-            </Text>
+            <View className="flex-row items-center justify-between gap-2 pt-3">
+              <Text className="text-sm font-semibold text-muted-foreground uppercase">
+                {section.title}
+              </Text>
+              {distanceTo ? (
+                <View className="flex-row items-center gap-1">
+                  <Icon as={NavigationIcon} className="size-3 text-blue-600" />
+                  <Text className="text-xs font-medium text-blue-600">Closest first</Text>
+                </View>
+              ) : null}
+            </View>
           )}
           renderItem={({ item }) => (
             <PlaceCard
               place={item.info}
               mode={mode}
               isSaved={item.saved !== undefined}
+              distance={item.distance}
+              openStatus={item.status}
               onToggle={() => {
                 if (item.saved) confirmRemove(item.saved);
                 else if (item.suggestion) void add(item.suggestion);
@@ -130,6 +170,43 @@ export function PlacesScreen() {
       </SafeAreaView>
     </View>
   );
+}
+
+// The list's cards: the saved places (with Google's fresh details when they're in the searched
+// area), then the suggestions that aren't saved yet, each with whether it's open at `now`
+function toRows(saved: Doc<'places'>[], suggestions: SuggestedPlace[], now: number) {
+  const suggestionById = new Map(suggestions.map((place) => [place.providerPlaceId, place]));
+  const savedIds = new Set(saved.map((place) => place.providerPlaceId));
+  const toRow = (row: Pick<Row, 'key' | 'info' | 'saved' | 'suggestion'>): Row => {
+    const status = openStatus(row.info.hours, now);
+    return { ...row, category: row.info.category, status, isOpen: isOpen(status) };
+  };
+  return {
+    savedRows: saved.map((place) => {
+      const suggestion = place.providerPlaceId
+        ? suggestionById.get(place.providerPlaceId)
+        : undefined;
+      // Prefer the fresh Google details (rating, description, hours) when the place is nearby
+      return toRow({ key: place._id, info: suggestion ?? place, saved: place, suggestion });
+    }),
+    suggestedRows: suggestions
+      .filter((place) => !savedIds.has(place.providerPlaceId))
+      .map((place) => toRow({ key: place.providerPlaceId, info: place, suggestion: place })),
+  };
+}
+
+// The sweet-spot crawl picks from the saved spots the list shows (so the chips narrow it too: a
+// dessert crawl). In the city the crawl is for now, so spots known to be closed are left out.
+function crawlSpots(rows: Row[], isInCity: boolean): CrawlSpot[] {
+  return rows
+    .filter((row) => !isInCity || row.status?.tone !== 'closed')
+    .map((row) => ({
+      key: row.key,
+      name: row.info.name,
+      coordinates: row.info.coordinates,
+      providerPlaceId: row.info.providerPlaceId,
+      rating: row.info.rating,
+    }));
 }
 
 // Under the list: a spinner while searching; the error with "Tap to try again" when the search

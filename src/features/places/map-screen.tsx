@@ -1,5 +1,6 @@
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
+import { useMyLocation } from '@/lib/my-location';
 import { PlaneTakeoffIcon } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
@@ -8,27 +9,31 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { DayRouteCard } from './components/day-route-card';
 import { DayRouteLayer } from './components/day-route-layer';
 import { ExploreCard } from './components/explore-card';
-import { FilterChips } from './components/filter-chips';
+import { FilterButton } from './components/filter-button';
+import { FilterPanel } from './components/filter-panel';
 import { MapSearchBar } from './components/map-search-bar';
 import { MapStatus } from './components/map-status';
 import { ModeSwitch } from './components/mode-switch';
 import { PinLayer } from './components/pin-layer';
 import { PlacePreviewCard } from './components/place-preview-card';
+import { isFiltered } from './place-filters';
 import { usePlaceMode } from './place-mode-context';
 import type { PlaceMode } from './place-modes';
 import { FEW_PLACES } from './map-area';
+import { useDistanceTo } from './use-distance';
 import { useMapPlaces } from './use-map-places';
 import { useMapRoute } from './use-map-route';
 import { useRevealPin } from './use-reveal-pin';
 
 // The second tab: a Google map with places as photo pins, for the side switched on under the
 // search bar: sights (orange suggestions, purple trip places, Google's normal map) or sweet
-// spots (pink suggestions, chocolate saved spots, a cream map; see place-modes.tsx). Filter
-// chips narrow the pins to one kind (Coffee, Parks…). Pins shrink to dots where they'd cover
-// each other and grow back as you zoom in (pin-layout.ts). Tapping a pin opens its pop-up at
-// the bottom, sliding the map up first if the pop-up would cover the pin; tapping the map
-// closes it. The search bar finds any city: the map flies there, shows its places, and offers
-// to plan a trip to it (use-explore-city.ts).
+// spots (pink suggestions, chocolate saved spots, a cream map; see place-modes.tsx). The filter
+// button next to the switch narrows the pins to one kind (Coffee, Parks…) and/or the places open
+// now, from a panel that drops down only when wanted, so the map keeps its room. Pins shrink to
+// dots where they'd cover each other and grow back as you zoom in (pin-layout.ts). Tapping a pin
+// opens its pop-up at the bottom, sliding the map up first if the pop-up would cover the pin;
+// tapping the map closes it. The search bar finds any city: the map flies there, shows its
+// places, and offers to plan a trip to it (use-explore-city.ts).
 //
 // Opened from the plan tab with ?day=N, the map shows that day's stops as a numbered route
 // instead (use-map-route.ts).
@@ -43,11 +48,15 @@ export function MapScreen() {
   const { trip, explore, initialRegion, pins, selectedKey, selected, select } = places;
   const revealPin = useRevealPin(mapRef);
   const route = useMapRoute(mapRef, () => select(null));
+  const location = useMyLocation();
+  const distanceTo = useDistanceTo(places.shownArea);
   // What the map shows right now, updated when it stops moving (sizes the pins)
   const [region, setRegion] = useState<Region | null>(null);
   // The same, but only where the user took the map: decides "Search this area"
   const [userRegion, setUserRegion] = useState<Region | null>(null);
   const [query, setQuery] = useState('');
+  // The filter panel under the switch; tapping the map or a pin closes it
+  const [isFilterOpen, setFilterOpen] = useState(false);
 
   if (trip === undefined) {
     return <ActivityIndicator className="flex-1 bg-background" />;
@@ -57,6 +66,7 @@ export function MapScreen() {
   const isRoute = route.tripDay !== undefined;
 
   function selectPin(key: string) {
+    setFilterOpen(false);
     select(key);
     const pin = pins.find((candidate) => candidate.key === key);
     if (pin) void revealPin.reveal(pin.coordinates);
@@ -79,11 +89,18 @@ export function MapScreen() {
         // shows "Search this area" after every tap
         moveOnMarkerPress={false}
         toolbarEnabled={false}
+        // Google's blue "you are here" dot, once the location is allowed (places tab, "Turn on").
+        // Without Google's own locate button: it would sit under the search bar.
+        showsUserLocation={location.access === 'granted'}
+        showsMyLocationButton={false}
         // Sweet spots get a warm cream map without Google's own shop icons
         customMapStyle={mode.mapStyle}
-        // Tapping the map (not a pin) closes the pop-up. iOS reports pin taps here too.
+        // Tapping the map (not a pin) closes the pop-up and the filter panel. iOS reports pin
+        // taps here too.
         onPress={(event) => {
-          if (event.nativeEvent.action !== 'marker-press') select(null);
+          if (event.nativeEvent.action === 'marker-press') return;
+          select(null);
+          setFilterOpen(false);
         }}
       >
         {isRoute ? (
@@ -115,6 +132,8 @@ export function MapScreen() {
               query={query}
               onQueryChange={setQuery}
               userRegion={userRegion}
+              isFilterOpen={isFilterOpen}
+              onFilterOpenChange={setFilterOpen}
             />
           )}
         </View>
@@ -136,6 +155,7 @@ export function MapScreen() {
         <PlacePreviewCard
           pin={selected}
           mode={mode}
+          distance={distanceTo?.(selected.coordinates)}
           exploringCity={exploring?.destination.name}
           onAdd={() => places.addPin(selected)}
           onRemove={() => places.removePin(selected)}
@@ -150,23 +170,31 @@ export function MapScreen() {
 type MapPlaces = ReturnType<typeof useMapPlaces>;
 
 // The top of the map while it shows places: the search bar, then (unless typing) the side
-// switch, the explored city with "Plan trip", what the map shows with "Search this area" or
-// "Search wider", and the filter chips
+// switch with the filter button (and its panel when open), the explored city with "Plan trip",
+// and what the map shows with "Search this area" or "Search wider"
 function PlacesOverlay({
   places,
   query,
   onQueryChange,
   userRegion,
+  isFilterOpen,
+  onFilterOpenChange,
 }: {
   places: MapPlaces;
   query: string;
   onQueryChange: (query: string) => void;
   userRegion: Region | null;
+  isFilterOpen: boolean;
+  onFilterOpenChange: (isOpen: boolean) => void;
 }) {
-  const { mode, setKind, filter, setFilterId } = usePlaceMode();
+  const { mode } = usePlaceMode();
   const { explore, select, shown, shownArea, widerArea } = places;
   const count = shown.data?.length ?? 0;
   const isSparse = !shown.isFetching && shown.error === null && count < FEW_PLACES;
+  // "7 of 18 sweet spots" while filtered, so it's clear some pins are hidden
+  const countLabel = isFiltered(places.filters)
+    ? `${places.pins.length} of ${mode.count(places.filterPlaces.length)}`
+    : mode.count(count);
 
   return (
     <>
@@ -182,13 +210,10 @@ function PlacesOverlay({
       />
       {query === '' ? (
         <>
-          <ModeSwitch
-            kind={mode.kind}
-            onChange={(kind) => {
-              // The open pop-up belongs to the other side's pins
-              select(null);
-              setKind(kind);
-            }}
+          <SideAndFilters
+            places={places}
+            isFilterOpen={isFilterOpen}
+            onFilterOpenChange={onFilterOpenChange}
           />
           {explore.exploring ? (
             <ExploreCard
@@ -204,7 +229,7 @@ function PlacesOverlay({
               title={places.title}
               searchedArea={shownArea}
               region={userRegion}
-              countLabel={mode.count(count)}
+              countLabel={countLabel}
               isLoading={shown.isFetching}
               error={shown.error}
               onRetry={() => void shown.refetch()}
@@ -219,14 +244,58 @@ function PlacesOverlay({
               }
             />
           ) : null}
-          <FilterChips
-            mode={mode}
-            categories={places.categories}
-            selected={filter}
-            onSelect={setFilterId}
-            contentClassName="px-0.5 py-1"
-          />
         </>
+      ) : null}
+    </>
+  );
+}
+
+// "[Sights | Sweet spots] (⚙)": the side switch with the filter button beside it, and the filter
+// panel under them while it's open
+function SideAndFilters({
+  places,
+  isFilterOpen,
+  onFilterOpenChange,
+}: {
+  places: MapPlaces;
+  isFilterOpen: boolean;
+  onFilterOpenChange: (isOpen: boolean) => void;
+}) {
+  const { mode, setKind, setFilterId, setOpenNow } = usePlaceMode();
+  const { filters, select } = places;
+  const activeCount = (filters.filter ? 1 : 0) + (filters.openNow ? 1 : 0);
+
+  return (
+    <>
+      <View pointerEvents="box-none" className="flex-row items-center justify-center gap-2">
+        <ModeSwitch
+          kind={mode.kind}
+          onChange={(kind) => {
+            // The open pop-up belongs to the other side's pins
+            select(null);
+            setKind(kind);
+          }}
+        />
+        <FilterButton
+          mode={mode}
+          activeCount={activeCount}
+          isOpen={isFilterOpen}
+          onPress={() => {
+            // The panel and the pin pop-up don't share the screen
+            select(null);
+            onFilterOpenChange(!isFilterOpen);
+          }}
+        />
+      </View>
+      {isFilterOpen ? (
+        <FilterPanel
+          mode={mode}
+          places={places.filterPlaces}
+          filters={filters}
+          onSelect={setFilterId}
+          onOpenNowChange={setOpenNow}
+          onClose={() => onFilterOpenChange(false)}
+        />
       ) : null}
     </>
   );

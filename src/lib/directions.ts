@@ -20,11 +20,16 @@ function stopValue(stop: Destination): string {
     : `${stop.coordinates.latitude},${stop.coordinates.longitude}`;
 }
 
-function destinationParams(stop: Destination): string {
+// "&destination=…&destination_place_id=…", or the same for the origin
+function placeParams(param: 'origin' | 'destination', stop: Destination): string {
   const id = stop.providerPlaceId
-    ? `&destination_place_id=${encodeURIComponent(stop.providerPlaceId)}`
+    ? `&${param}_place_id=${encodeURIComponent(stop.providerPlaceId)}`
     : '';
-  return `&destination=${stopValue(stop)}${id}`;
+  return `&${param}=${stopValue(stop)}${id}`;
+}
+
+function destinationParams(stop: Destination): string {
+  return placeParams('destination', stop);
 }
 
 // Directions from where the phone is to one place: the route, how long it takes, and a Start
@@ -34,13 +39,17 @@ export function openDirections(destination: Destination) {
   openLink(`${DIRECTIONS_URL}${destinationParams(destination)}`);
 }
 
-// A walking route from where the phone is through a day's stops, in order: the last stop is the
-// destination, the others are stops on the way (up to 9, Google Maps' limit).
-export function openRouteDirections(stops: Destination[]) {
-  const last = stops.at(-1);
+// A walking route through stops in order (a day's plan, a sweet-spot crawl): the last stop is
+// the destination, the others are stops on the way (up to 9, Google Maps' limit). It starts where
+// the phone is, or with `startAtFirst`, at the first stop: for planning from home, where a route
+// from the phone would begin in another country.
+export function openRouteDirections(stops: Destination[], { startAtFirst = false } = {}) {
+  const origin = startAtFirst ? stops[0] : undefined;
+  const route = origin ? stops.slice(1) : stops;
+  const last = route.at(-1);
   if (last === undefined) return;
-  const onTheWay = stops.slice(0, -1).slice(0, MAX_WAYPOINTS);
-  let url = `${DIRECTIONS_URL}${destinationParams(last)}`;
+  const onTheWay = route.slice(0, -1).slice(0, MAX_WAYPOINTS);
+  let url = `${DIRECTIONS_URL}${origin ? placeParams('origin', origin) : ''}${destinationParams(last)}`;
   if (onTheWay.length > 0) {
     url += `&waypoints=${onTheWay.map(stopValue).join(SEPARATOR)}`;
     // Place IDs only work when every stop on the way has one, in the same order

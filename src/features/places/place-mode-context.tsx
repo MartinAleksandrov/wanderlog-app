@@ -15,14 +15,19 @@ const PlaceModeContext = createContext<{
   setKind: (kind: PlaceKind) => void;
   filters: Filters;
   setFilters: (filters: Filters) => void;
+  openNow: boolean;
+  setOpenNow: (openNow: boolean) => void;
 } | null>(null);
 
-// Which side the map and places tabs show, and each side's filter chip. Lives in the tabs
-// layout, above both tabs, so the switch and chips on one tab change the other too. The side is
-// remembered between app launches; the chips start on "All".
+// Which side the map and places tabs show, each side's filter chip, and the "Open now" filter.
+// Lives in the tabs layout, above both tabs, so the switch and chips on one tab change the other
+// too. The side is remembered between app launches; the chips start on "All" and "Open now" off.
+// "Open now" is one switch for both sides: looking for what's open goes for cafés and museums
+// alike.
 export function PlaceModeProvider({ children }: { children: ReactNode }) {
   const [kind, setKindState] = useState<PlaceKind>('sight');
   const [filters, setFilters] = useState<Filters>({ sight: null, sweet: null });
+  const [openNow, setOpenNow] = useState(false);
 
   // The side picked last time. Reading takes a moment, so sights show first.
   useEffect(() => {
@@ -40,14 +45,16 @@ export function PlaceModeProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <PlaceModeContext value={{ kind, setKind, filters, setFilters }}>{children}</PlaceModeContext>
+    <PlaceModeContext value={{ kind, setKind, filters, setFilters, openNow, setOpenNow }}>
+      {children}
+    </PlaceModeContext>
   );
 }
 
 export function usePlaceMode() {
   const context = use(PlaceModeContext);
   if (context === null) throw new Error('usePlaceMode needs a PlaceModeProvider above it');
-  const { kind, setKind, filters, setFilters } = context;
+  const { kind, setKind, filters, setFilters, openNow, setOpenNow } = context;
   const mode = PLACE_MODES[kind];
   return {
     kind,
@@ -56,6 +63,10 @@ export function usePlaceMode() {
     // The chip picked on this side, or null for "All"
     filter: mode.filters.find((filter) => filter.id === filters[kind]) ?? null,
     setFilterId: (id: string | null) => setFilters({ ...filters, [kind]: id }),
+    // Only places open right now (places whose hours Google doesn't know are hidden too, as in
+    // Google Maps)
+    openNow,
+    setOpenNow,
   };
 }
 

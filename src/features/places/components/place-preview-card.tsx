@@ -3,8 +3,11 @@ import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { errorMessage } from '@/lib/error-message';
+import { formatDistance } from '@/lib/geo';
+import { useNow } from '@/lib/use-now';
 import { cn } from '@/lib/utils';
 import { api } from '@convex/_generated/api';
+import type { SuggestedPlace } from '@convex/googlePlaces';
 import { skipToken, useQuery as useCachedQuery } from '@tanstack/react-query';
 import { useAction } from 'convex/react';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -25,8 +28,10 @@ import {
   View,
 } from 'react-native';
 import Animated, { FadeInDown, FadeOutDown, LayoutAnimationConfig } from 'react-native-reanimated';
+import { openStatus } from '../open-status';
 import type { PlaceMode } from '../place-modes';
 import { DirectionsButton } from './directions-button';
+import { OpenBadge } from './open-badge';
 import type { Pin } from './pin-layer';
 import { SAVED_POP } from './saved-pop';
 
@@ -34,6 +39,8 @@ type PlacePreviewCardProps = {
   pin: Pin;
   // Sights or sweet spots: the card's colours, words and saved mark
   mode: PlaceMode;
+  // Metres from the phone, when it's in the city (see use-distance.ts)
+  distance?: number;
   // Set while exploring another city: its places can't join the current trip, so the main
   // button offers to plan a trip there instead
   exploringCity?: string;
@@ -44,7 +51,7 @@ type PlacePreviewCardProps = {
 };
 
 // The pop-up at the bottom of the map for the tapped pin: the place's photos (swipe for more),
-// rating, Google's short description, and the buttons:
+// rating, how far away it is (in the city), Google's short description, and the buttons:
 // - the main one: save a suggestion ("Add to trip" / "Save sweet spot"), remove a saved place,
 //   or "Plan a trip" while exploring another city
 // - Directions: the blue Google Maps arrow, opens turn-by-turn directions to the place
@@ -55,6 +62,7 @@ type PlacePreviewCardProps = {
 export function PlacePreviewCard({
   pin,
   mode,
+  distance,
   exploringCity,
   onAdd,
   onRemove,
@@ -102,11 +110,12 @@ export function PlacePreviewCard({
               {pin.name}
             </Text>
             <View className="flex-row flex-wrap items-center gap-x-2 gap-y-1">
-              {category ? <Text variant="muted">{category}</Text> : null}
-              {place?.rating ? (
-                <RatingText rating={place.rating} ratingCount={place.ratingCount} />
-              ) : null}
-              {details.isLoading ? <ActivityIndicator size="small" /> : null}
+              <PlaceFacts
+                category={category}
+                place={place}
+                distance={distance}
+                isLoading={details.isLoading}
+              />
               {/* Pops in when the place is saved here, not when an already-saved one opens */}
               <LayoutAnimationConfig skipEntering>
                 {pin.saved ? <SavedTag mode={mode} /> : null}
@@ -217,6 +226,34 @@ function MainAction({
         {mode.addLabel}
       </Text>
     </Button>
+  );
+}
+
+// "Museum ★ 4.8 (64,836) 100 m away ● Open · closes 18:00", wrapping onto a second line when
+// needed. The open status follows the clock while the pop-up is open.
+function PlaceFacts({
+  category,
+  place,
+  distance,
+  isLoading,
+}: {
+  category?: string;
+  place?: SuggestedPlace;
+  distance?: number;
+  isLoading: boolean;
+}) {
+  const now = useNow();
+  const status = openStatus(place?.hours, now);
+  return (
+    <>
+      {category ? <Text variant="muted">{category}</Text> : null}
+      {place?.rating ? <RatingText rating={place.rating} ratingCount={place.ratingCount} /> : null}
+      {distance === undefined ? null : (
+        <Text className="text-sm font-medium">{formatDistance(distance)} away</Text>
+      )}
+      {status ? <OpenBadge status={status} /> : null}
+      {isLoading ? <ActivityIndicator size="small" /> : null}
+    </>
   );
 }
 
