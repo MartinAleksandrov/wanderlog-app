@@ -24,10 +24,11 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeOutDown, LayoutAnimationConfig } from 'react-native-reanimated';
 import type { PlaceMode } from '../place-modes';
 import { DirectionsButton } from './directions-button';
 import type { Pin } from './pin-layer';
+import { SAVED_POP } from './saved-pop';
 
 type PlacePreviewCardProps = {
   pin: Pin;
@@ -106,7 +107,10 @@ export function PlacePreviewCard({
                 <RatingText rating={place.rating} ratingCount={place.ratingCount} />
               ) : null}
               {details.isLoading ? <ActivityIndicator size="small" /> : null}
-              {pin.saved ? <SavedTag mode={mode} /> : null}
+              {/* Pops in when the place is saved here, not when an already-saved one opens */}
+              <LayoutAnimationConfig skipEntering>
+                {pin.saved ? <SavedTag mode={mode} /> : null}
+              </LayoutAnimationConfig>
             </View>
           </View>
           <Button
@@ -229,10 +233,12 @@ function RatingText({ rating, ratingCount }: { rating: number; ratingCount?: num
 // The "✓ In your trip" / "♥ Saved" tag, matching the saved pin's mark
 function SavedTag({ mode }: { mode: PlaceMode }) {
   return (
-    <View className={cn('flex-row items-center gap-1 rounded-full px-2 py-0.5', mode.tag)}>
-      <Icon as={mode.savedIcon} strokeWidth={3} className={cn('size-3', mode.tagText)} />
-      <Text className={cn('text-xs font-semibold', mode.tagText)}>{mode.savedLabel}</Text>
-    </View>
+    <Animated.View entering={SAVED_POP}>
+      <View className={cn('flex-row items-center gap-1 rounded-full px-2 py-0.5', mode.tag)}>
+        <Icon as={mode.savedIcon} strokeWidth={3} className={cn('size-3', mode.tagText)} />
+        <Text className={cn('text-xs font-semibold', mode.tagText)}>{mode.savedLabel}</Text>
+      </View>
+    </Animated.View>
   );
 }
 

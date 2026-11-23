@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { errorMessage } from '@/lib/error-message';
-import { RotateCwIcon, SearchIcon } from 'lucide-react-native';
+import { ExpandIcon, RotateCwIcon, SearchIcon } from 'lucide-react-native';
 import { ActivityIndicator, View } from 'react-native';
 import type { Region } from 'react-native-maps';
 import { hasMovedAway, regionToArea } from '../map-area';
@@ -20,11 +20,13 @@ type MapStatusProps = {
   error: Error | null;
   onRetry: () => void;
   onSearchArea: (area: SearchArea) => void;
+  // Set when few places were found: "Search 10 km around", which doubles the radius
+  wider?: { label: string; onPress: () => void };
 };
 
 // Under the map's search bar: what the map is showing and how many places, the
-// "Search this area" button once the map has moved away from the searched area, and a retry
-// button when the search failed.
+// "Search this area" button once the map has moved away from the searched area, a "search
+// wider" button when a small town has few places, and a retry button when the search failed.
 export function MapStatus({
   title,
   searchedArea,
@@ -34,6 +36,7 @@ export function MapStatus({
   error,
   onRetry,
   onSearchArea,
+  wider,
 }: MapStatusProps) {
   const visibleArea = region ? regionToArea(region) : null;
 
@@ -53,6 +56,16 @@ export function MapStatus({
         >
           <Icon as={SearchIcon} className="size-4" />
           <Text>Search this area</Text>
+        </Button>
+      ) : wider ? (
+        <Button
+          size="sm"
+          variant="outline"
+          className="rounded-full bg-background shadow-md"
+          onPress={wider.onPress}
+        >
+          <Icon as={ExpandIcon} className="size-4" />
+          <Text>{wider.label}</Text>
         </Button>
       ) : null}
       {error ? (

@@ -6,8 +6,10 @@ import { cn } from '@/lib/utils';
 import type { Coordinates } from '@convex/schema';
 import { PlusIcon } from 'lucide-react-native';
 import { Pressable, View } from 'react-native';
+import Animated, { LayoutAnimationConfig } from 'react-native-reanimated';
 import type { PlaceMode } from '../place-modes';
 import { DirectionsButton } from './directions-button';
+import { SAVED_POP } from './saved-pop';
 
 // What a card can show. Suggestions from Google have everything; a saved place that's outside
 // the current search area has only what the backend stores.
@@ -84,7 +86,15 @@ export function PlaceCard({ place, mode, isSaved, onToggle, onPress }: PlaceCard
             onPress={onToggle}
             className={isSaved ? mode.savedButton : mode.addButton}
           >
-            <Icon as={isSaved ? mode.savedIcon : PlusIcon} className="size-4 text-white" />
+            {/* The heart or check pops in when saved here; the + doesn't animate */}
+            <LayoutAnimationConfig skipEntering>
+              <Animated.View
+                key={isSaved ? 'saved' : 'add'}
+                entering={isSaved ? SAVED_POP : undefined}
+              >
+                <Icon as={isSaved ? mode.savedIcon : PlusIcon} className="size-4 text-white" />
+              </Animated.View>
+            </LayoutAnimationConfig>
             <Text className="text-white">{isSaved ? mode.savedLabel : mode.addLabel}</Text>
           </Button>
           {/* The same round blue arrow as on the map, so both buttons fit on one row */}
