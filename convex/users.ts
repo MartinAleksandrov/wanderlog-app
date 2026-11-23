@@ -1,19 +1,29 @@
-import { query } from './_generated/server';
+import { mutation, query } from './_generated/server';
+import { getCurrentUser, requireUser } from './lib/permissions';
 
-// "Who am I?" from the backend's point of view. Convex verifies the Clerk token that came with
-// the request; if it's valid, ctx.auth knows the user. Returns null for signed-out callers.
-// The app uses it to prove the whole chain works: Clerk sign-in -> token -> Convex trusts it.
-export const viewer = query({
+// Creates the signed-in person's users row. The app calls it right after sign-in, so queries
+// find the row from the start. Safe to call again: it returns the existing row's ID.
+export const store = mutation({
   args: {},
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (identity === null) return null;
+    const user = await requireUser(ctx);
+    return user._id;
+  },
+});
 
-    return {
-      // Clerk's user ID (e.g. "user_2abc..."): the stable key we'll attach trips to later
-      clerkUserId: identity.subject,
-      email: identity.email ?? null,
-      name: identity.name ?? null,
-    };
+// The account screen's data from our backend: the app role and how many trips the user is in.
+// Name, email and photo come from Clerk on the device, which always has the latest values.
+// null while signed out or before `store` has run.
+export const me = query({
+  args: {},
+  handler: async (ctx) => {
+    const user = await getCurrentUser(ctx);
+    if (user === null) return null;
+
+    const memberships = await ctx.db
+      .query('tripMembers')
+      .withIndex('by_user', (q) => q.eq('userId', user._id))
+      .collect();
+    return { role: user.role, tripCount: memberships.length };
   },
 });

@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
+import { showError } from '@/lib/error-message';
 import { useAuth } from '@clerk/expo';
 import { LogOut } from 'lucide-react-native';
 
@@ -10,7 +11,13 @@ export function SignOutButton() {
   const { signOut } = useAuth();
 
   return (
-    <Button variant="outline" onPress={() => void signOut()}>
+    <Button
+      variant="outline"
+      onPress={() =>
+        // Signing out talks to Clerk's servers, so it can fail without a connection
+        void signOut().catch((error: unknown) => showError("Couldn't sign out", error))
+      }
+    >
       <Icon as={LogOut} />
       <Text>Sign out</Text>
     </Button>

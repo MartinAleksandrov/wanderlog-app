@@ -17,4 +17,7 @@ export const env = {
   ),
   // Address of our Convex deployment; written to .env.local by `npx convex dev`
   convexUrl: required('EXPO_PUBLIC_CONVEX_URL', process.env.EXPO_PUBLIC_CONVEX_URL),
+  // The same deployment's HTTP routes (convex/http.ts, e.g. place photos), which Convex serves
+  // on a .convex.site address; also written by `npx convex dev`
+  convexSiteUrl: required('EXPO_PUBLIC_CONVEX_SITE_URL', process.env.EXPO_PUBLIC_CONVEX_SITE_URL),
 };

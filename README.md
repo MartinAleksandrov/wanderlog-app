@@ -15,9 +15,21 @@ The app needs a [Clerk](https://clerk.com) application (sign-in) and a [Convex](
 deployment (backend). Create `.env.local` in the repo root (gitignored):
 
 ```bash
-EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...   # Clerk dashboard → API keys
-EXPO_PUBLIC_CONVEX_URL=https://....convex.cloud # written by `npx convex dev`
+EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...        # Clerk dashboard → API keys
+EXPO_PUBLIC_CONVEX_URL=https://....convex.cloud      # written by `npx convex dev`
+EXPO_PUBLIC_CONVEX_SITE_URL=https://....convex.site  # written by `npx convex dev`
+GOOGLE_MAPS_ANDROID_API_KEY=AIza...                  # Google key 2 below; native builds only
 ```
+
+Places and the map use [Google Maps Platform](https://console.cloud.google.com/google/maps-apis/start)
+(billing account required; each API has a monthly free allowance). Enable **Places API (New)** and
+**Maps SDK for Android**, then create two API keys under APIs & Services → Credentials:
+
+1. **Server key**, restricted to Places API (New). It stays on the backend:
+   `npx convex env set GOOGLE_MAPS_API_KEY <key>`
+2. **Android map key**, restricted to Maps SDK for Android. It ships inside the app (manifest), so
+   it only allows loading the map, which Google doesn't charge for. Put it in `.env.local` as above
+   and run the prebuild command again. Expo Go uses Expo's own key and doesn't need it.
 
 Convex must also trust Clerk's tokens: activate the Convex integration in the Clerk dashboard,
 then set its Frontend API URL on the Convex deployment:
