@@ -131,6 +131,16 @@ function RootNavigator() {
             sheetCornerRadius: 24,
           }}
         />
+        {/* The plan's "Add places" list, the same kind of sheet */}
+        <Stack.Screen
+          name="add-stops"
+          options={{
+            presentation: 'formSheet',
+            sheetAllowedDetents: [0.6, 1],
+            sheetGrabberVisible: true,
+            sheetCornerRadius: 24,
+          }}
+        />
       </Stack.Protected>
       <Stack.Protected guard={!isAuthenticated}>
         <Stack.Screen name="(auth)" />

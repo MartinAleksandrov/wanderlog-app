@@ -10,6 +10,7 @@
 
 import type * as googlePlaces from "../googlePlaces.js";
 import type * as http from "../http.js";
+import type * as itinerary from "../itinerary.js";
 import type * as lib_permissions from "../lib/permissions.js";
 import type * as places from "../places.js";
 import type * as trips from "../trips.js";
@@ -24,6 +25,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   googlePlaces: typeof googlePlaces;
   http: typeof http;
+  itinerary: typeof itinerary;
   "lib/permissions": typeof lib_permissions;
   places: typeof places;
   trips: typeof trips;

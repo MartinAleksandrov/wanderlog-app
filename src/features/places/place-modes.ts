@@ -1,10 +1,17 @@
 import type { Doc } from '@convex/_generated/dataModel';
 import type { PlaceKind } from '@convex/schema';
 import {
+  BinocularsIcon,
+  CakeSliceIcon,
+  CastleIcon,
   CheckIcon,
+  ChurchIcon,
+  CoffeeIcon,
   CroissantIcon,
+  EggFriedIcon,
   HeartIcon,
   LandmarkIcon,
+  TreesIcon,
   type LucideIcon,
 } from 'lucide-react-native';
 
@@ -16,6 +23,15 @@ import type { MapStyleElement } from 'react-native-maps';
 //           saved spots with a heart, on a warm cream map
 // Both sides use the same screens and components; everything that differs lives here. Class
 // names are written out in full (never built from pieces) so Tailwind finds them.
+
+// A filter chip ("Coffee", "Parks"): a place matches when Google's category for it ("Coffee
+// Shop", "City Park"…) contains one of the words
+export type PlaceFilter = { id: string; label: string; icon: LucideIcon; words: string[] };
+
+export function matchesFilter(category: string | undefined, filter: PlaceFilter): boolean {
+  const text = category?.toLowerCase() ?? '';
+  return filter.words.some((word) => text.includes(word));
+}
 
 // How one kind of pin looks (see components/place-pin.tsx)
 export type PinLook = {
@@ -66,6 +82,8 @@ export type PlaceMode = {
   bannerIcon: string;
   // The legend's sample dots
   legend: { suggested: string; saved: string };
+  // The filter chips under the switch, in this order
+  filters: PlaceFilter[];
   // Google map styling; [] is Google's normal map
   mapStyle: MapStyleElement[];
 };
@@ -133,6 +151,28 @@ export const PLACE_MODES: Record<PlaceKind, PlaceMode> = {
     banner: 'bg-orange-50 dark:bg-orange-950/40',
     bannerIcon: 'bg-orange-500',
     legend: { suggested: 'border-orange-500 bg-white', saved: 'border-white bg-purple-600' },
+    filters: [
+      { id: 'museums', label: 'Museums', icon: LandmarkIcon, words: ['museum', 'gallery'] },
+      {
+        id: 'landmarks',
+        label: 'Landmarks',
+        icon: CastleIcon,
+        words: ['landmark', 'monument', 'castle', 'palace', 'fortress', 'attraction', 'ruins'],
+      },
+      { id: 'parks', label: 'Parks', icon: TreesIcon, words: ['park', 'garden'] },
+      {
+        id: 'churches',
+        label: 'Churches',
+        icon: ChurchIcon,
+        words: ['church', 'cathedral', 'chapel', 'monastery', 'mosque', 'synagogue', 'temple'],
+      },
+      {
+        id: 'views',
+        label: 'Views',
+        icon: BinocularsIcon,
+        words: ['observation', 'scenic', 'viewpoint', 'lookout'],
+      },
+    ],
     mapStyle: [],
   },
   sweet: {
@@ -181,6 +221,28 @@ export const PLACE_MODES: Record<PlaceKind, PlaceMode> = {
     banner: 'bg-pink-50 dark:bg-pink-950/40',
     bannerIcon: 'bg-pink-500',
     legend: { suggested: 'border-pink-500 bg-white', saved: 'border-white bg-amber-900' },
+    filters: [
+      // "tea house", not "tea": that would also match "Steak House"
+      {
+        id: 'coffee',
+        label: 'Coffee',
+        icon: CoffeeIcon,
+        words: ['coffee', 'cafe', 'café', 'espresso', 'tea house'],
+      },
+      {
+        id: 'bakery',
+        label: 'Bakery',
+        icon: CroissantIcon,
+        words: ['bakery', 'pastry', 'bagel', 'croissant'],
+      },
+      { id: 'brunch', label: 'Brunch', icon: EggFriedIcon, words: ['breakfast', 'brunch'] },
+      {
+        id: 'dessert',
+        label: 'Dessert',
+        icon: CakeSliceIcon,
+        words: ['dessert', 'cake', 'ice cream', 'gelato', 'donut', 'chocolate', 'confection'],
+      },
+    ],
     mapStyle: CREAM_MAP,
   },
 };

@@ -6,6 +6,7 @@ import type { PlaceKind } from '@convex/schema';
 import type { OptimisticUpdate } from 'convex/browser';
 import { useMutation } from 'convex/react';
 import type { FunctionArgs } from 'convex/server';
+import * as Haptics from 'expo-haptics';
 import { Alert } from 'react-native';
 import { PLACE_MODES, placeKindOf } from './place-modes';
 
@@ -63,6 +64,8 @@ export function usePlaceActions(tripId: Id<'trips'> | undefined, kind: PlaceKind
 
   async function add(place: SuggestedPlace) {
     if (tripId === undefined) return;
+    // A light tap you can feel, as the pin changes colour
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
       // Only the fields the backend stores; rating and summary are looked up fresh from Google
       await addPlace({

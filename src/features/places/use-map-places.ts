@@ -4,7 +4,9 @@ import { useState, type RefObject } from 'react';
 import type MapView from 'react-native-maps';
 import type { Region } from 'react-native-maps';
 import type { Pin } from './components/pin-layer';
-import { areaToRegion } from './map-area';
+import { areaToRegion, widerSearchArea } from './map-area';
+import { usePlaceMode } from './place-mode-context';
+import { matchesFilter } from './place-modes';
 import { useTripPlaces } from './trip-places';
 import { useExploreCity } from './use-explore-city';
 import { usePlaceActions } from './use-place-actions';
@@ -27,11 +29,17 @@ export function useMapPlaces(mapRef: RefObject<MapView | null>) {
   const explore = useExploreCity(trip?._id ?? null, area, mapRef);
   const { exploring } = explore;
   const shown = exploring ? explore.suggestions : suggestions;
+  const { filter } = usePlaceMode();
   // The pin whose pop-up is open. Remembered by key (the Google place ID), so the pop-up stays
   // with the place while it's saved or removed, and closes by itself when the pin leaves the
-  // map.
+  // map (or is filtered out).
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const pins = toPins(saved ?? [], shown.data ?? []);
+  const allPins = toPins(saved ?? [], shown.data ?? []);
+  // The filter chip picked (Coffee, Parks…); places without a category only show under All
+  const pins = filter ? allPins.filter((pin) => matchesFilter(pin.category, filter)) : allPins;
+  const shownArea = exploring?.area ?? area;
+  const searchShownArea = exploring ? explore.searchArea : searchArea;
+  const widerArea = shownArea ? widerSearchArea(shownArea) : null;
 
   return {
     // undefined while loading, null when the user has no trip
@@ -40,11 +48,21 @@ export function useMapPlaces(mapRef: RefObject<MapView | null>) {
     explore,
     // The suggestion pins' search: the explored city's, otherwise the trip's
     shown,
-    shownArea: exploring?.area ?? area,
-    searchShownArea: exploring ? explore.searchArea : searchArea,
+    shownArea,
+    searchShownArea,
+    // Few places found (a small town): offer the same search over twice the radius, flying the
+    // map out to show it. null once the search is as wide as Google allows.
+    widerArea,
+    searchWider: () => {
+      if (widerArea === null) return;
+      mapRef.current?.animateToRegion(areaToRegion(widerArea), 700);
+      searchShownArea(widerArea);
+    },
     title: exploring ? `Exploring ${exploring.destination.name}` : (trip?.name ?? ''),
     initialRegion: area ? areaToRegion(area) : NO_TRIP_REGION,
     pins,
+    // Every pin's category before filtering, to count the filter chips
+    categories: allPins.map((pin) => pin.category),
     selectedKey,
     selected: pins.find((pin) => pin.key === selectedKey),
     select: setSelectedKey,

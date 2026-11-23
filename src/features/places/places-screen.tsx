@@ -1,3 +1,4 @@
+import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { NoTripState } from '@/features/trips';
@@ -6,12 +7,15 @@ import { cn } from '@/lib/utils';
 import type { Doc } from '@convex/_generated/dataModel';
 import type { SuggestedPlace } from '@convex/googlePlaces';
 import { useRouter } from 'expo-router';
+import { ExpandIcon } from 'lucide-react-native';
 import { ActivityIndicator, Pressable, SectionList, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { FilterChips } from './components/filter-chips';
 import { ModeSwitch } from './components/mode-switch';
 import { PlaceCard, type PlaceInfo } from './components/place-card';
 import { usePlaceMode } from './place-mode-context';
-import type { PlaceMode } from './place-modes';
+import { matchesFilter, type PlaceMode } from './place-modes';
+import { FEW_PLACES, widerSearchArea } from './map-area';
 import { useTripPlaces } from './trip-places';
 import { usePlaceActions } from './use-place-actions';
 
@@ -19,12 +23,12 @@ import { usePlaceActions } from './use-place-actions';
 type Row = { key: string; info: PlaceInfo; saved?: Doc<'places'>; suggestion?: SuggestedPlace };
 
 // The third tab: the same places as the map, as a list with photos and details, for the side
-// switched on at the top (sights or sweet spots). Saved ones first, then the suggestions that
-// aren't saved yet.
+// switched on at the top (sights or sweet spots) and the filter chip picked (shared with the
+// map). Saved ones first, then the suggestions that aren't saved yet.
 export function PlacesScreen() {
   const router = useRouter();
-  const { mode, setKind } = usePlaceMode();
-  const { trip, saved, suggestions } = useTripPlaces();
+  const { mode, setKind, filter, setFilterId } = usePlaceMode();
+  const { trip, area, saved, suggestions, searchArea } = useTripPlaces();
   const { add, confirmRemove } = usePlaceActions(trip?._id, mode.kind);
 
   // The pop-up with more details. Name and photo go along so its top shows at once, and the
@@ -56,24 +60,23 @@ export function PlacesScreen() {
 
   const suggestionById = new Map(suggestions.data?.map((place) => [place.providerPlaceId, place]));
   const savedIds = new Set(saved?.map((place) => place.providerPlaceId));
+  const savedRows = (saved ?? []).map((place): Row => {
+    const suggestion = place.providerPlaceId
+      ? suggestionById.get(place.providerPlaceId)
+      : undefined;
+    // Prefer the fresh Google details (rating, description) when the place is nearby
+    return { key: place._id, info: suggestion ?? place, saved: place, suggestion };
+  });
+  const suggestedRows = (suggestions.data ?? [])
+    .filter((place) => !savedIds.has(place.providerPlaceId))
+    .map((place): Row => ({ key: place.providerPlaceId, info: place, suggestion: place }));
+  // The filter chip picked (Coffee, Parks…); places without a category only show under All
+  const isShown = (row: Row) => filter === null || matchesFilter(row.info.category, filter);
   const sections = [
-    {
-      title: mode.savedTitle,
-      data: (saved ?? []).map((place): Row => {
-        const suggestion = place.providerPlaceId
-          ? suggestionById.get(place.providerPlaceId)
-          : undefined;
-        // Prefer the fresh Google details (rating, description) when the place is nearby
-        return { key: place._id, info: suggestion ?? place, saved: place, suggestion };
-      }),
-    },
-    {
-      title: mode.suggestedTitle,
-      data: (suggestions.data ?? [])
-        .filter((place) => !savedIds.has(place.providerPlaceId))
-        .map((place): Row => ({ key: place.providerPlaceId, info: place, suggestion: place })),
-    },
+    { title: mode.savedTitle, data: savedRows.filter(isShown) },
+    { title: mode.suggestedTitle, data: suggestedRows.filter(isShown) },
   ].filter((section) => section.data.length > 0);
+  const widerArea = area ? widerSearchArea(area) : null;
 
   return (
     <View className="flex-1 bg-background">
@@ -87,6 +90,15 @@ export function PlacesScreen() {
             <View className="gap-3 pt-4">
               <ModeSwitch kind={mode.kind} onChange={setKind} />
               <ModeBanner mode={mode} destination={trip.destination} />
+              <FilterChips
+                mode={mode}
+                categories={[...savedRows, ...suggestedRows].map((row) => row.info.category)}
+                selected={filter}
+                onSelect={setFilterId}
+                // Full width, so the chips scroll from edge to edge
+                className="-mx-4"
+                contentClassName="px-4 py-1"
+              />
             </View>
           }
           renderSectionHeader={({ section }) => (
@@ -107,23 +119,55 @@ export function PlacesScreen() {
             />
           )}
           ListFooterComponent={
-            suggestions.isFetching ? (
-              <ActivityIndicator className="py-6" />
-            ) : suggestions.error ? (
-              // Tap to search again (e.g. after the connection is back)
-              <Pressable
-                onPress={() => void suggestions.refetch()}
-                className="items-center gap-1 py-6"
-              >
-                <Text className="text-center text-sm text-destructive">
-                  {errorMessage(suggestions.error)}
-                </Text>
-                <Text className="text-sm font-semibold">Tap to try again</Text>
-              </Pressable>
-            ) : null
+            <ListFooter
+              mode={mode}
+              suggestions={suggestions}
+              onSearchWider={widerArea ? () => searchArea(widerArea) : undefined}
+              widerKm={widerArea ? Math.round(widerArea.radiusMeters / 1000) : 0}
+            />
           }
         />
       </SafeAreaView>
+    </View>
+  );
+}
+
+// Under the list: a spinner while searching; the error with "Tap to try again" when the search
+// failed; and when a small town has few places, the offer to search twice as far around
+function ListFooter({
+  mode,
+  suggestions,
+  onSearchWider,
+  widerKm,
+}: {
+  mode: PlaceMode;
+  suggestions: ReturnType<typeof useTripPlaces>['suggestions'];
+  onSearchWider?: () => void;
+  widerKm: number;
+}) {
+  const count = suggestions.data?.length ?? 0;
+  if (suggestions.isFetching) return <ActivityIndicator className="py-6" />;
+  if (suggestions.error) {
+    return (
+      // Tap to search again (e.g. after the connection is back)
+      <Pressable onPress={() => void suggestions.refetch()} className="items-center gap-1 py-6">
+        <Text className="text-center text-sm text-destructive">
+          {errorMessage(suggestions.error)}
+        </Text>
+        <Text className="text-sm font-semibold">Tap to try again</Text>
+      </Pressable>
+    );
+  }
+  if (count >= FEW_PLACES || onSearchWider === undefined) return null;
+  return (
+    <View className="items-center gap-3 rounded-2xl border border-dashed border-border p-5">
+      <Text variant="muted" className="text-center">
+        Only {mode.count(count)} around here.
+      </Text>
+      <Button variant="outline" onPress={onSearchWider}>
+        <Icon as={ExpandIcon} className="size-4" />
+        <Text>Search {widerKm} km around</Text>
+      </Button>
     </View>
   );
 }

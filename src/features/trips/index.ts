@@ -4,3 +4,5 @@ export { DestinationResults } from './components/destination-results';
 export { NoTripState } from './components/no-trip-state';
 export { HomeScreen } from './home-screen';
 export { NewTripScreen } from './new-trip-screen';
+export { formatDateRange, todayIsoDate } from './trip-dates';
+export { todayDayNumber, tripDays, type TripDay } from './trip-days';

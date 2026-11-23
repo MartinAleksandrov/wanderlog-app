@@ -122,6 +122,8 @@ export default defineSchema({
         placeId: v.id('places'),
         // Optional planned time, 'HH:mm'
         startTime: v.optional(v.string()),
+        // Ticked off on the day ("been there"): the plan's next stop is the first one not done
+        done: v.optional(v.boolean()),
       }),
       v.object({
         ...itineraryItemBase,
