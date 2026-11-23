@@ -1,5 +1,5 @@
 import { defineSchema, defineTable } from 'convex/server';
-import { v } from 'convex/values';
+import { v, type Infer } from 'convex/values';
 
 // Wanderlog's data for the first release. How the tables relate:
 //
@@ -16,6 +16,7 @@ export const coordinates = v.object({
   latitude: v.number(),
   longitude: v.number(),
 });
+export type Coordinates = Infer<typeof coordinates>;
 
 // What a person may do in the whole app (separate from their role in any one trip).
 // Exported so functions check roles against the same list.
@@ -52,6 +53,9 @@ export default defineSchema({
     // New users always start as 'user'. Only an existing admin (or a manual edit in the Convex
     // dashboard) can make someone an admin; the app never sends a role for itself.
     role: appRole,
+    // The trip the map and places tabs show. Kept on the server, so it's the same on every
+    // device. May point to a deleted trip; functions then fall back to the newest trip.
+    activeTripId: v.optional(v.id('trips')),
   }).index('by_clerk_user_id', ['clerkUserId']),
 
   trips: defineTable({
@@ -60,6 +64,8 @@ export default defineSchema({
     destination: v.string(),
     // Where the trip map opens before any places are saved
     destinationCoordinates: v.optional(coordinates),
+    // Google photo name of the destination, the trip card's cover image (see convex/http.ts)
+    destinationPhotoName: v.optional(v.string()),
     // Calendar dates as 'YYYY-MM-DD', not timestamps: a trip day is the same date in every
     // time zone
     startDate: v.string(),
@@ -87,8 +93,12 @@ export default defineSchema({
     name: v.string(),
     coordinates,
     address: v.optional(v.string()),
-    // Shown in the pin's pop-up
-    photoUrl: v.optional(v.string()),
+    // Google photo name ("places/…/photos/…"), shown on the pin and in the places list. A name,
+    // not a URL: the app turns it into an image URL through our backend (see convex/http.ts),
+    // so the Google API key never ships inside the app.
+    photoName: v.optional(v.string()),
+    // What kind of place it is, e.g. "Museum"
+    category: v.optional(v.string()),
     // The place's ID at the place-search provider (e.g. Google Places), to load more details
     providerPlaceId: v.optional(v.string()),
     notes: v.optional(v.string()),

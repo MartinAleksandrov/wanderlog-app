@@ -1,29 +1,72 @@
 import '@/global.css';
 
 import { env } from '@/lib/env';
+import { installGlobalErrorHandler, reportError } from '@/lib/error-reporting';
 import { NAV_THEME } from '@/lib/theme';
 import { ClerkProvider, useAuth } from '@clerk/expo';
 import { tokenCache } from '@clerk/expo/token-cache';
+import { api } from '@convex/_generated/api';
 import { PortalHost } from '@rn-primitives/portal';
-import { ConvexReactClient, useConvexAuth } from 'convex/react';
+import { QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ConvexReactClient, useConvexAuth, useMutation } from 'convex/react';
 import { ConvexProviderWithClerk } from 'convex/react-clerk';
+import { ConvexError } from 'convex/values';
 import { Stack } from 'expo-router';
 import { ThemeProvider } from 'expo-router/react-navigation';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
+import { LogBox } from 'react-native';
 import { useUniwind } from 'uniwind';
 
-const convex = new ConvexReactClient(env.convexUrl);
+// First thing: errors outside rendering (button handlers, timers, forgotten promises) get
+// reported from here on. Errors while rendering are caught by the screens' error boundaries.
+installGlobalErrorHandler();
+
+// One Convex client per app run. Hot reload (development) runs this file again on every save;
+// a new client each time left the old connections running (a reconnect loop) and briefly
+// showed a signed-in user the sign-in screen. Reusing the client avoids both.
+const globals = globalThis as typeof globalThis & { __convexClient?: ConvexReactClient };
+// (Dropped connections aren't reported: Android closes the socket whenever the app goes to the
+// background, and Convex reconnects by itself.)
+const convex = (globals.__convexClient ??= new ConvexReactClient(env.convexUrl));
+
+// Cache for one-off requests that aren't live Convex queries: the Google Places searches
+// (Convex actions). Convex queries keep themselves up to date and don't go through it.
+// Retries: an error our backend throws on purpose (ConvexError, e.g. "not set up") won't change
+// on a retry, so show it at once; anything else (a network blip) gets one more try, since every
+// Google request is paid.
+const queryClient = new QueryClient({
+  // Screens show search errors themselves; unexpected ones are also reported
+  queryCache: new QueryCache({
+    onError: (error) => {
+      if (!(error instanceof ConvexError)) reportError(error, 'query');
+    },
+  }),
+  defaultOptions: {
+    queries: {
+      retry: (failureCount, error) => !(error instanceof ConvexError) && failureCount < 1,
+    },
+  },
+});
+
+// Development only. This React Native version no longer shows warnings in the app: they print
+// in the Metro terminal (and React Native DevTools). What's left in the app is a one-off
+// "Open debugger to view warnings" toast, which Clerk's development-keys notice triggered on
+// every start; it covered the tab bar and blocked taps. Both are hidden here. Warnings still
+// print in the terminal, and errors still show as red toasts.
+LogBox.ignoreLogs([
+  'Clerk: Clerk has been loaded with development keys',
+  'Open debugger to view warnings',
+]);
 
 // Keep the splash screen up until we know whether the user is signed in,
 // so the app doesn't flash the sign-in screen at someone who's already logged in.
 void SplashScreen.preventAutoHideAsync();
 
-export {
-  // Shows an error screen instead of crashing if any screen throws while rendering
-  ErrorBoundary,
-} from 'expo-router';
+// The last line of defence: an error while rendering the providers or navigation itself shows
+// the same "Something went wrong / Try again" screen instead of a blank app
+export { ScreenErrorBoundary as ErrorBoundary } from '@/components/screen-error-boundary';
 
 export default function RootLayout() {
   // 'light' or 'dark', following the phone's setting
@@ -38,11 +81,13 @@ export default function RootLayout() {
           one line is exempted on purpose. */}
       {/* react-doctor-disable-next-line react-hooks-js/hooks */}
       <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
-        <ThemeProvider value={NAV_THEME[theme ?? 'light']}>
-          <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
-          <RootNavigator />
-          <PortalHost />
-        </ThemeProvider>
+        <QueryClientProvider client={queryClient}>
+          <ThemeProvider value={NAV_THEME[theme ?? 'light']}>
+            <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
+            <RootNavigator />
+            <PortalHost />
+          </ThemeProvider>
+        </QueryClientProvider>
       </ConvexProviderWithClerk>
     </ClerkProvider>
   );
@@ -53,15 +98,39 @@ export default function RootLayout() {
 // When the state changes (sign in, sign out), the guards flip and Expo Router moves the user.
 function RootNavigator() {
   const { isLoading, isAuthenticated } = useConvexAuth();
+  const storeUser = useMutation(api.users.store);
 
   useEffect(() => {
     if (!isLoading) void SplashScreen.hideAsync();
   }, [isLoading]);
 
+  // After every sign-in, make sure the backend has this person's users row, so trips can point
+  // to it. Mutations create the row too if it's missing, so a failure here isn't fatal.
+  useEffect(() => {
+    if (isAuthenticated) {
+      storeUser().catch((error: unknown) => reportError(error, 'action'));
+    }
+  }, [isAuthenticated, storeUser]);
+
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Protected guard={isAuthenticated}>
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen
+          name="new-trip"
+          options={{ presentation: 'modal', headerShown: true, title: 'Choose your next trip' }}
+        />
+        {/* Slides up from the bottom: 60% of the screen first, drag up for the full height.
+            Sheets have no header; the screen draws its own title. */}
+        <Stack.Screen
+          name="place/[placeId]"
+          options={{
+            presentation: 'formSheet',
+            sheetAllowedDetents: [0.6, 1],
+            sheetGrabberVisible: true,
+            sheetCornerRadius: 24,
+          }}
+        />
       </Stack.Protected>
       <Stack.Protected guard={!isAuthenticated}>
         <Stack.Screen name="(auth)" />
