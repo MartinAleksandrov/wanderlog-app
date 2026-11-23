@@ -2,15 +2,15 @@ import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { errorMessage } from '@/lib/error-message';
-import { openLink } from '@/lib/open-link';
 import { cn } from '@/lib/utils';
 import { api } from '@convex/_generated/api';
 import type { PlaceDetails } from '@convex/googlePlaces';
 import { useQuery as useCachedQuery } from '@tanstack/react-query';
 import { useAction, useQuery } from 'convex/react';
 import { useLocalSearchParams } from 'expo-router';
-import { CheckIcon, NavigationIcon, PlusIcon } from 'lucide-react-native';
+import { PlusIcon } from 'lucide-react-native';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
+import { DirectionsButton } from './components/directions-button';
 import {
   PhotoStrip,
   PlaceFacts,
@@ -18,17 +18,21 @@ import {
   ReviewList,
   Section,
 } from './components/place-details-parts';
+import { PLACE_MODES, placeKindOf, type PlaceMode } from './place-modes';
 import { usePlaceActions } from './use-place-actions';
 
 // Route params. The name and photo come from the tapped card, so the top of the sheet shows
-// at once while the rest loads.
-type PlaceParams = { placeId: string; name?: string; photoName?: string };
+// at once while the rest loads. `kind` is the side it was opened from: the sheet sits outside
+// the tabs, so it can't see their switch.
+type PlaceParams = { placeId: string; name?: string; photoName?: string; kind?: string };
 
-// The pop-up that slides up when a place is tapped in the places tab (a form sheet route,
-// src/app/place/[placeId].tsx): photos, rating, opening hours, contact details and reviews, plus
-// adding it to the trip or getting directions. Scrolls when it's taller than the sheet.
+// The pop-up that slides up when a place is tapped in the places tab or "Details" on the map
+// (a form sheet route, src/app/place/[placeId].tsx): photos, rating, opening hours, contact
+// details and reviews, plus saving it or getting directions. Scrolls when it's taller than the
+// sheet.
 export function PlaceDetailsSheet() {
-  const { placeId, name, photoName } = useLocalSearchParams<PlaceParams>();
+  const { placeId, name, photoName, kind } = useLocalSearchParams<PlaceParams>();
+  const mode = PLACE_MODES[kind === 'sweet' ? 'sweet' : 'sight'];
   const getPlaceDetails = useAction(api.googlePlaces.placeDetails);
   // Cached per place: opening the same place again doesn't call Google
   const details = useCachedQuery({
@@ -50,7 +54,7 @@ export function PlaceDetailsSheet() {
         <Text variant="h3">{place?.name ?? name}</Text>
         {place ? <PlaceSummaryLine place={place} /> : null}
       </View>
-      <PlaceButtons place={place} />
+      <PlaceButtons place={place} mode={mode} />
 
       {place ? (
         <>
@@ -84,43 +88,33 @@ export function PlaceDetailsSheet() {
   );
 }
 
-// "Add to trip" (orange) or "In your trip" (purple, tap to remove) for the active trip, and
-// directions in Google Maps. Disabled until the details have loaded.
-function PlaceButtons({ place }: { place?: PlaceDetails }) {
+// Save the place to the active trip's list for this side ("Add to trip" / "Save sweet spot"),
+// or show it's saved (tap to remove), and directions in Google Maps. Saving waits until the
+// details have loaded.
+function PlaceButtons({ place, mode }: { place?: PlaceDetails; mode: PlaceMode }) {
   const trip = useQuery(api.trips.active);
   const saved = useQuery(api.places.listForTrip, trip ? { tripId: trip._id } : 'skip');
-  const { add, confirmRemove } = usePlaceActions(trip?._id);
-  const savedPlace = place && saved?.find((p) => p.providerPlaceId === place.providerPlaceId);
+  const { add, confirmRemove } = usePlaceActions(trip?._id, mode.kind);
+  const savedPlace =
+    place &&
+    saved?.find((p) => p.providerPlaceId === place.providerPlaceId && placeKindOf(p) === mode.kind);
 
   return (
     <View className="flex-row gap-2">
       {trip ? (
         <Button
           disabled={place === undefined}
-          className={cn(
-            'flex-1',
-            savedPlace
-              ? 'bg-purple-600 active:bg-purple-700'
-              : 'bg-orange-500 active:bg-orange-600',
-          )}
+          className={cn('flex-1', savedPlace ? mode.savedButton : mode.addButton)}
           onPress={() => {
             if (savedPlace) confirmRemove(savedPlace);
             else if (place) void add(place);
           }}
         >
-          <Icon as={savedPlace ? CheckIcon : PlusIcon} className="size-4 text-white" />
-          <Text className="text-white">{savedPlace ? 'In your trip' : 'Add to trip'}</Text>
+          <Icon as={savedPlace ? mode.savedIcon : PlusIcon} className="size-4 text-white" />
+          <Text className="text-white">{savedPlace ? mode.savedLabel : mode.addLabel}</Text>
         </Button>
       ) : null}
-      <Button
-        variant="outline"
-        className="flex-1"
-        disabled={!place?.googleMapsUrl}
-        onPress={() => openLink(place?.googleMapsUrl ?? '')}
-      >
-        <Icon as={NavigationIcon} className="size-4" />
-        <Text>Directions</Text>
-      </Button>
+      {place ? <DirectionsButton withLabel destination={place} className="h-10 flex-1" /> : null}
     </View>
   );
 }

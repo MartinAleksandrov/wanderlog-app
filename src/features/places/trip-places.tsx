@@ -1,9 +1,11 @@
 import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
-import type { Coordinates } from '@convex/schema';
+import type { Coordinates, PlaceKind } from '@convex/schema';
 import { skipToken, useQuery as useCachedQuery } from '@tanstack/react-query';
 import { useAction, useQuery } from 'convex/react';
 import { createContext, use, useState, type ReactNode } from 'react';
+import { usePlaceMode } from './place-mode-context';
+import { placeKindOf } from './place-modes';
 
 // Where to look for places: a circle on the map, remembered per trip
 export type SearchArea = { center: Coordinates; radiusMeters: number };
@@ -24,44 +26,56 @@ export function SearchAreaProvider({ children }: { children: ReactNode }) {
   return <SearchAreaContext value={{ area, setArea }}>{children}</SearchAreaContext>;
 }
 
-// Places to visit around an area, from Google through our backend. `scope` keeps separate
-// lists apart (a trip's ID, or 'explore' for a city found with the map's search bar).
+// Places of one kind (sights or sweet spots) around an area, from Google through our backend.
+// `scope` keeps separate lists apart (a trip's ID, or 'explore' for a city found with the map's
+// search bar).
 //
-// TanStack Query caches the answer per area: screens showing the same area share one request,
-// and going back to an earlier area doesn't pay Google again while the app is open.
-export function useAttractions(area: SearchArea | null, scope: string | undefined) {
-  const nearbyAttractions = useAction(api.googlePlaces.nearbyAttractions);
+// TanStack Query caches the answer per area and kind: screens showing the same area share one
+// request, and going back to an earlier area, or switching sides back and forth, doesn't pay
+// Google again while the app is open.
+export function useNearbyPlaces(
+  area: SearchArea | null,
+  scope: string | undefined,
+  kind: PlaceKind,
+) {
+  const nearbyPlaces = useAction(api.googlePlaces.nearbyPlaces);
 
   return useCachedQuery({
     queryKey: [
-      'attractions',
+      'nearby-places',
       scope,
+      kind,
       area?.center.latitude,
       area?.center.longitude,
       area?.radiusMeters,
     ],
-    // Only the two fields the backend accepts (a remembered area also carries its tripId)
+    // Only the fields the backend accepts (a remembered area also carries its tripId)
     queryFn: area
-      ? () => nearbyAttractions({ center: area.center, radiusMeters: area.radiusMeters })
+      ? () => nearbyPlaces({ center: area.center, radiusMeters: area.radiusMeters, kind })
       : skipToken,
     staleTime: Infinity,
     // While a new area loads, keep showing the previous one's places, but only within the same
-    // scope, so switching trips never flashes the other city's places
+    // scope and kind, so switching trips or sides never flashes the other list's places
     placeholderData: (previous, previousQuery) =>
-      previousQuery?.queryKey[1] === scope ? previous : undefined,
+      previousQuery?.queryKey[1] === scope && previousQuery?.queryKey[2] === kind
+        ? previous
+        : undefined,
   });
 }
 
-// Everything the map and places tabs show for the active trip:
+// Everything the map and places tabs show for the active trip, for the side that's switched on
+// (sights or sweet spots, see place-modes.tsx):
 // - trip:        the active trip (undefined while loading, null when the user has none)
-// - saved:       places saved to the trip, live from Convex (purple)
-// - suggestions: places to visit in the search area, from Google (orange)
+// - saved:       that side's places saved to the trip, live from Convex
+// - suggestions: that side's places in the search area, from Google
 export function useTripPlaces() {
   const context = use(SearchAreaContext);
   if (context === null) throw new Error('useTripPlaces needs a SearchAreaProvider above it');
+  const { kind } = usePlaceMode();
 
   const trip = useQuery(api.trips.active);
-  const saved = useQuery(api.places.listForTrip, trip ? { tripId: trip._id } : 'skip');
+  const allSaved = useQuery(api.places.listForTrip, trip ? { tripId: trip._id } : 'skip');
+  const saved = allSaved?.filter((place) => placeKindOf(place) === kind);
 
   // The area last searched on the map while it belongs to this trip, otherwise the destination
   const area: SearchArea | null =
@@ -71,11 +85,11 @@ export function useTripPlaces() {
         ? { center: trip.destinationCoordinates, radiusMeters: DEFAULT_RADIUS_METERS }
         : null;
 
-  const suggestions = useAttractions(area, trip?._id);
+  const suggestions = useNearbyPlaces(area, trip?._id, kind);
 
   function searchArea(next: SearchArea) {
     if (trip) context?.setArea({ ...next, tripId: trip._id });
   }
 
-  return { trip, area, saved, suggestions, searchArea };
+  return { trip, kind, area, saved, suggestions, searchArea };
 }

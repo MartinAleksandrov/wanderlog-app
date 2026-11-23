@@ -3,4 +3,5 @@
 export { MapScreen } from './map-screen';
 export { PlaceDetailsSheet } from './place-details-sheet';
 export { PlacesScreen } from './places-screen';
+export { PlaceModeProvider, PlacesTabIcon } from './place-mode-context';
 export { SearchAreaProvider } from './trip-places';

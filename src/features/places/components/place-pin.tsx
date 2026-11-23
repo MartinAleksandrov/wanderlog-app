@@ -3,12 +3,13 @@ import { Text } from '@/components/ui/text';
 import { placeIcon } from '@/lib/place-icon';
 import { placePhotoUrl } from '@/lib/place-photo-url';
 import { cn } from '@/lib/utils';
-import type { Coordinates } from '@convex/schema';
-import { CheckIcon } from 'lucide-react-native';
+import type { Coordinates, PlaceKind } from '@convex/schema';
+import type { LucideIcon } from 'lucide-react-native';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Image, View } from 'react-native';
 import { Marker } from 'react-native-maps';
 import type { PinSize } from '../pin-layout';
+import { PLACE_MODES, type PinLook } from '../place-modes';
 
 const PHOTO_TIMEOUT_MS = 6000;
 
@@ -18,7 +19,9 @@ type PlacePinProps = {
   // Google's place type: picks the icon when there's no photo
   category?: string;
   coordinates: Coordinates;
-  // Purple when the place is in the trip, orange when it's only suggested
+  // Which side of the app it belongs to: picks the colours (see place-modes.tsx)
+  kind: PlaceKind;
+  // Saved to the trip (solid, with a check or heart) or only suggested (white label)
   isSaved: boolean;
   // The pin whose pop-up is open: drawn with a ring around it, on top of the others
   isSelected: boolean;
@@ -27,35 +30,11 @@ type PlacePinProps = {
   onPress: () => void;
 };
 
-// The two kinds of pin. A suggestion is a white label with an orange outline: dark text on white
-// reads better on the map than white text on orange. A trip place is solid purple with a check
-// mark, so it stands out from suggestions even for someone who can't tell the colours apart.
-const LOOKS = {
-  suggested: {
-    body: 'border-orange-500 bg-white',
-    text: 'text-neutral-900',
-    tail: 'border-t-orange-500',
-    ring: 'bg-orange-500/35',
-    dot: 'bg-orange-500',
-    iconCircle: 'bg-orange-100',
-    icon: 'text-orange-600',
-  },
-  saved: {
-    body: 'border-white bg-purple-600',
-    text: 'text-white',
-    tail: 'border-t-purple-600',
-    ring: 'bg-purple-600/35',
-    dot: 'bg-purple-600',
-    iconCircle: 'bg-white/25',
-    icon: 'text-white',
-  },
-} as const;
-
-type Look = (typeof LOOKS)[keyof typeof LOOKS];
-
 // A map pin: a rounded label with the place's photo (or an icon for its kind of place) and its
 // name when there's room, on a pointed tail whose tip marks the spot. Where pins are crowded it's
-// just a small dot on the spot. The selected pin gets a soft ring in its colour.
+// just a small dot on the spot. The selected pin gets a soft ring in its colour. Saved places
+// carry a check (sights) or a heart (sweet spots), so they stand out from suggestions even for
+// someone who can't tell the colours apart.
 //
 // Android draws custom pins into a picture. While tracksViewChanges is on it redraws them all
 // the time, which makes the map slow, so it's switched off once the pin looks final: the photo
@@ -69,6 +48,7 @@ export function PlacePin({
   photoName,
   category,
   coordinates,
+  kind,
   isSaved,
   isSelected,
   size,
@@ -80,7 +60,8 @@ export function PlacePin({
   const [isLaidOut, setIsLaidOut] = useState(false);
   const showPhoto = size !== 'mini' && photoName !== undefined && photo !== 'failed';
   const isFinal = showPhoto ? photo === 'loaded' : isLaidOut;
-  const look = LOOKS[isSaved ? 'saved' : 'suggested'];
+  const mode = PLACE_MODES[kind];
+  const look = mode.pins[isSaved ? 'saved' : 'suggested'];
 
   // No photo after all: draw again until the icon that replaces it has been laid out
   function giveUpPhoto() {
@@ -118,7 +99,7 @@ export function PlacePin({
           <PinLabel name={name} look={look} isSelected={isSelected} showName={size === 'full'}>
             <PinThumb
               look={look}
-              isSaved={isSaved}
+              badge={isSaved ? { icon: mode.savedIcon, className: mode.pinBadge } : undefined}
               category={category}
               photoName={showPhoto ? photoName : undefined}
               onPhotoLoad={() => setPhoto('loaded')}
@@ -141,7 +122,7 @@ function PinLabel({
   children,
 }: {
   name: string;
-  look: Look;
+  look: PinLook;
   isSelected: boolean;
   showName: boolean;
   children: ReactNode;
@@ -177,21 +158,22 @@ function PinLabel({
   );
 }
 
-// The round photo, or an icon for the kind of place, with a check mark for a trip place.
-// The photo must appear in full the moment it loads: Android fades images in over 300 ms, and
-// the pin's last picture is taken right at onLoad, when the photo is still see-through. So it's
-// React Native's Image with fadeDuration={0} (expo-image's fade can't be fully switched off).
+// The round photo, or an icon for the kind of place, with a badge (check or heart) for a saved
+// place. The photo must appear in full the moment it loads: Android fades images in over
+// 300 ms, and the pin's last picture is taken right at onLoad, when the photo is still
+// see-through. So it's React Native's Image with fadeDuration={0} (expo-image's fade can't be
+// fully switched off).
 function PinThumb({
   look,
-  isSaved,
+  badge,
   category,
   photoName,
   onPhotoLoad,
   onPhotoError,
   onIconLayout,
 }: {
-  look: Look;
-  isSaved: boolean;
+  look: PinLook;
+  badge?: { icon: LucideIcon; className: string };
   category?: string;
   // Undefined when the icon is shown instead
   photoName?: string;
@@ -217,9 +199,9 @@ function PinThumb({
           <Icon as={placeIcon(category)} className={cn('size-4', look.icon)} />
         </View>
       )}
-      {isSaved ? (
+      {badge ? (
         <View className="absolute -right-0.5 -bottom-0.5 size-3.5 items-center justify-center rounded-full bg-white">
-          <Icon as={CheckIcon} strokeWidth={4} className="size-2.5 text-purple-600" />
+          <Icon as={badge.icon} strokeWidth={4} className={cn('size-2.5', badge.className)} />
         </View>
       ) : null}
     </View>

@@ -8,7 +8,8 @@ import { useState, type RefObject } from 'react';
 import { Keyboard } from 'react-native';
 import type MapView from 'react-native-maps';
 import { areaToRegion } from './map-area';
-import { DEFAULT_RADIUS_METERS, useAttractions, type SearchArea } from './trip-places';
+import { usePlaceMode } from './place-mode-context';
+import { DEFAULT_RADIUS_METERS, useNearbyPlaces, type SearchArea } from './trip-places';
 
 // A city found with the map's search bar, shown instead of the trip's city. Remembers which
 // trip was active, so creating a trip from it (which changes the active trip) ends the exploring.
@@ -33,7 +34,9 @@ export function useExploreCity(
   // a spinner instead of looking frozen
   const [isLocating, setIsLocating] = useState(false);
   const exploring = explore !== null && explore.tripId === tripId ? explore : null;
-  const suggestions = useAttractions(exploring?.area ?? null, 'explore');
+  // The explored city's sights or sweet spots, whichever side is switched on
+  const { kind } = usePlaceMode();
+  const suggestions = useNearbyPlaces(exploring?.area ?? null, 'explore', kind);
 
   async function start(destination: DestinationSuggestion) {
     Keyboard.dismiss();

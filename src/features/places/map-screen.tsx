@@ -8,21 +8,27 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ExploreCard } from './components/explore-card';
 import { MapSearchBar } from './components/map-search-bar';
 import { MapStatus } from './components/map-status';
+import { ModeSwitch } from './components/mode-switch';
 import { PinLayer } from './components/pin-layer';
 import { PlacePreviewCard } from './components/place-preview-card';
+import { usePlaceMode } from './place-mode-context';
+import type { PlaceMode } from './place-modes';
 import { useMapPlaces } from './use-map-places';
 
-// The second tab: a Google map with places to visit as photo pins. Orange = suggested, purple =
-// in your trip. Pins shrink to dots where they'd cover each other and grow back as you zoom in
-// (pin-layout.ts). Tapping a pin opens its pop-up at the bottom (photos, rating, description,
-// add or remove); tapping the map closes it. The search bar finds any city: the map flies
-// there, shows its sights, and offers to plan a trip to it (use-explore-city.ts).
+// The second tab: a Google map with places as photo pins, for the side switched on under the
+// search bar: sights (orange suggestions, purple trip places, Google's normal map) or sweet
+// spots (pink suggestions, chocolate saved spots, a cream map; see place-modes.tsx). Pins
+// shrink to dots where they'd cover each other and grow back as you zoom in (pin-layout.ts).
+// Tapping a pin opens its pop-up at the bottom (photos, rating, description, save or remove,
+// directions); tapping the map closes it. The search bar finds any city: the map flies there,
+// shows its places, and offers to plan a trip to it (use-explore-city.ts).
 //
 // Google's logo (bottom left) must stay visible: the pin pop-up floats above it, the hint for
 // someone without a trip gets fixed room under the map via mapPadding, and other cards go at
 // the top. The padding never changes while a map is shown: changing it cancels the map's fly-to.
 export function MapScreen() {
   const mapRef = useRef<MapView>(null);
+  const { mode, setKind } = usePlaceMode();
   const {
     trip,
     explore,
@@ -62,6 +68,8 @@ export function MapScreen() {
         // shows "Search this area" after every tap
         moveOnMarkerPress={false}
         toolbarEnabled={false}
+        // Sweet spots get a warm cream map without Google's own shop icons
+        customMapStyle={mode.mapStyle}
         // Tapping the map (not a pin) closes the pop-up. iOS reports pin taps here too.
         onPress={(event) => {
           if (event.nativeEvent.action !== 'marker-press') select(null);
@@ -72,6 +80,7 @@ export function MapScreen() {
           region={region ?? initialRegion}
           selectedKey={selectedKey}
           onSelect={select}
+          kind={mode.kind}
         />
       </MapView>
 
@@ -88,16 +97,27 @@ export function MapScreen() {
               void explore.start(destination);
             }}
           />
-          {/* The cards under the search bar make way for its results while typing */}
+          {/* The switch and cards under the search bar make way for its results while typing */}
           {query === '' ? (
-            <TopCards
-              explore={explore}
-              title={title}
-              shown={shown}
-              shownArea={shownArea}
-              region={region}
-              onSearchArea={searchShownArea}
-            />
+            <>
+              <ModeSwitch
+                kind={mode.kind}
+                onChange={(kind) => {
+                  // The open pop-up belongs to the other side's pins
+                  select(null);
+                  setKind(kind);
+                }}
+              />
+              <TopCards
+                explore={explore}
+                title={title}
+                countLabel={mode.count(shown.data?.length ?? 0)}
+                shown={shown}
+                shownArea={shownArea}
+                region={region}
+                onSearchArea={searchShownArea}
+              />
+            </>
           ) : null}
         </View>
       </SafeAreaView>
@@ -106,21 +126,18 @@ export function MapScreen() {
         <View className="absolute inset-x-3 bottom-3 flex-row items-center gap-3 rounded-2xl border border-border bg-background p-4 shadow-lg">
           <Icon as={PlaneTakeoffIcon} className="size-6 text-orange-500" />
           <Text className="flex-1">
-            Search a city above to see its sights, then plan your first trip there.
+            Search a city above to see its {mode.label.toLowerCase()}, then plan your first trip
+            there.
           </Text>
         </View>
       ) : null}
-      {trip && !selected ? (
-        // Bottom right: Google's logo sits bottom left. The pin pop-up takes its place.
-        <View className="absolute right-3 bottom-3 gap-1 rounded-lg bg-background/90 px-3 py-2">
-          <Legend className="border-orange-500 bg-white" label="Suggested" />
-          <Legend className="border-white bg-purple-600" label="In your trip" />
-        </View>
-      ) : null}
+      {/* Bottom right: Google's logo sits bottom left. The pin pop-up takes its place. */}
+      {trip && !selected ? <MapLegend mode={mode} /> : null}
       {/* Hidden while typing in the search bar, so it doesn't sit on top of the keyboard */}
       {selected && query === '' ? (
         <PlacePreviewCard
           pin={selected}
+          mode={mode}
           exploringCity={exploring?.destination.name}
           onAdd={() => addPin(selected)}
           onRemove={() => removePin(selected)}
@@ -139,6 +156,7 @@ type MapPlaces = ReturnType<typeof useMapPlaces>;
 function TopCards({
   explore,
   title,
+  countLabel,
   shown,
   shownArea,
   region,
@@ -146,6 +164,8 @@ function TopCards({
 }: {
   explore: MapPlaces['explore'];
   title: string;
+  // "20 places" / "14 sweet spots"
+  countLabel: string;
   shown: MapPlaces['shown'];
   shownArea: MapPlaces['shownArea'];
   region: Region | null;
@@ -168,7 +188,7 @@ function TopCards({
           title={title}
           searchedArea={shownArea}
           region={region}
-          placeCount={shown.data?.length ?? 0}
+          countLabel={countLabel}
           isLoading={shown.isFetching}
           error={shown.error}
           onRetry={() => void shown.refetch()}
@@ -179,7 +199,17 @@ function TopCards({
   );
 }
 
-// A small sample of each kind of pin, with what its colour means
+// What the two pin colours mean, for the side that's switched on
+function MapLegend({ mode }: { mode: PlaceMode }) {
+  return (
+    <View className="absolute right-3 bottom-3 gap-1 rounded-lg bg-background/90 px-3 py-2">
+      <Legend className={mode.legend.suggested} label="Suggested" />
+      <Legend className={mode.legend.saved} label={mode.savedTitle} />
+    </View>
+  );
+}
+
+// A small sample of one kind of pin, with what its colour means
 function Legend({ className, label }: { className: string; label: string }) {
   return (
     <View className="flex-row items-center gap-2">

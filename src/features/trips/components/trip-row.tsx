@@ -1,6 +1,7 @@
 import { PlacePhoto } from '@/components/place-photo';
 import { Text } from '@/components/ui/text';
 import { Pressable, View } from 'react-native';
+import { savedCounts } from '../saved-counts';
 import { formatDateRange } from '../trip-dates';
 import type { TripSummary } from '../types';
 
@@ -24,9 +25,7 @@ export function TripRow({ trip, onPress }: { trip: TripSummary; onPress: () => v
         <Text variant="muted" numberOfLines={1}>
           {formatDateRange(trip.startDate, trip.endDate)}
         </Text>
-        <Text variant="muted">
-          {trip.placeCount === 1 ? '1 place' : `${trip.placeCount} places`}
-        </Text>
+        <Text variant="muted">{savedCounts(trip)}</Text>
       </View>
     </Pressable>
   );

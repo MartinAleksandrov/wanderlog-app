@@ -3,13 +3,18 @@ import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
-import { CheckIcon, PlusIcon } from 'lucide-react-native';
+import type { Coordinates } from '@convex/schema';
+import { PlusIcon } from 'lucide-react-native';
 import { Pressable, View } from 'react-native';
+import type { PlaceMode } from '../place-modes';
+import { DirectionsButton } from './directions-button';
 
 // What a card can show. Suggestions from Google have everything; a saved place that's outside
 // the current search area has only what the backend stores.
 export type PlaceInfo = {
   name: string;
+  coordinates: Coordinates;
+  providerPlaceId?: string;
   photoName?: string;
   category?: string;
   rating?: number;
@@ -20,15 +25,18 @@ export type PlaceInfo = {
 
 type PlaceCardProps = {
   place: PlaceInfo;
+  // Sights or sweet spots: the button's colours and words
+  mode: PlaceMode;
   isSaved: boolean;
   onToggle: () => void;
-  // Tapping the card (anywhere but the button) opens the place's pop-up with more details
+  // Tapping the card (anywhere but the buttons) opens the place's pop-up with more details
   onPress: () => void;
 };
 
-// One place in the places tab: photo, type and rating, Google's short description, address,
-// and a button that adds it to the trip (orange) or shows it's in the trip (purple, like the pins).
-export function PlaceCard({ place, isSaved, onToggle, onPress }: PlaceCardProps) {
+// One place in the places tab: photo, type and rating, Google's short description, address, a
+// button that saves it (suggestion colour) or shows it's saved (saved colour, like the pins),
+// and directions in Google Maps.
+export function PlaceCard({ place, mode, isSaved, onToggle, onPress }: PlaceCardProps) {
   const rating = place.rating
     ? `★ ${place.rating}${place.ratingCount ? ` (${place.ratingCount.toLocaleString()})` : ''}`
     : null;
@@ -39,7 +47,10 @@ export function PlaceCard({ place, isSaved, onToggle, onPress }: PlaceCardProps)
       onPress={onPress}
       accessibilityRole="button"
       accessibilityHint="Shows more about this place"
-      className="flex-row gap-3 rounded-xl border border-border bg-card p-3 active:bg-accent"
+      className={cn(
+        'flex-row gap-3 rounded-xl border bg-card p-3 active:bg-accent',
+        mode.cardBorder,
+      )}
     >
       <PlacePhoto
         photoName={place.photoName}
@@ -67,17 +78,18 @@ export function PlaceCard({ place, isSaved, onToggle, onPress }: PlaceCardProps)
             {place.address}
           </Text>
         ) : null}
-        <Button
-          size="sm"
-          onPress={onToggle}
-          className={cn(
-            'mt-1 self-start',
-            isSaved ? 'bg-purple-600 active:bg-purple-700' : 'bg-orange-500 active:bg-orange-600',
-          )}
-        >
-          <Icon as={isSaved ? CheckIcon : PlusIcon} className="size-4 text-white" />
-          <Text className="text-white">{isSaved ? 'In your trip' : 'Add to trip'}</Text>
-        </Button>
+        <View className="mt-1 flex-row flex-wrap gap-2">
+          <Button
+            size="sm"
+            onPress={onToggle}
+            className={isSaved ? mode.savedButton : mode.addButton}
+          >
+            <Icon as={isSaved ? mode.savedIcon : PlusIcon} className="size-4 text-white" />
+            <Text className="text-white">{isSaved ? mode.savedLabel : mode.addLabel}</Text>
+          </Button>
+          {/* The same round blue arrow as on the map, so both buttons fit on one row */}
+          <DirectionsButton destination={place} className="size-9" />
+        </View>
       </View>
     </Pressable>
   );
