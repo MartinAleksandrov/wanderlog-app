@@ -2,32 +2,38 @@ import { showError } from '@/lib/error-message';
 import { api } from '@convex/_generated/api';
 import type { Doc, Id } from '@convex/_generated/dataModel';
 import type { SuggestedPlace } from '@convex/googlePlaces';
+import type { PlaceKind } from '@convex/schema';
 import type { OptimisticUpdate } from 'convex/browser';
 import { useMutation } from 'convex/react';
 import type { FunctionArgs } from 'convex/server';
 import { Alert } from 'react-native';
+import { PLACE_MODES, placeKindOf } from './place-modes';
 
-// Optimistic updates: the app changes its own copy of the saved places right away (the pin turns
-// purple instantly) instead of waiting a server round trip, which took about 3 s on a slow
+// Optimistic updates: the app changes its own copy of the saved places right away (the pin
+// changes colour instantly) instead of waiting a server round trip, which took about 3 s on a slow
 // network. Convex then replaces the guess with the real result, or undoes it if the server
 // refuses (e.g. no permission), and the caller's catch shows why. They run when the mutation is
 // called, never while rendering, so they live out here.
 
 const addOptimistically: OptimisticUpdate<FunctionArgs<typeof api.places.add>> = (
   store,
-  { tripId, place },
+  { tripId, kind, place },
 ) => {
   const saved = store.getQuery(api.places.listForTrip, { tripId });
-  // Not loaded on this device yet, or already saved: nothing to show early
-  if (saved === undefined || saved.some((p) => p.providerPlaceId === place.providerPlaceId)) {
+  // Not loaded on this device yet, or already on this list: nothing to show early
+  if (
+    saved === undefined ||
+    saved.some((p) => p.providerPlaceId === place.providerPlaceId && placeKindOf(p) === kind)
+  ) {
     return;
   }
   const guess: Doc<'places'> = {
     // Stand-ins until the server answers with the real row
-    _id: `optimistic-${place.providerPlaceId}` as Id<'places'>,
+    _id: `optimistic-${kind}-${place.providerPlaceId}` as Id<'places'>,
     _creationTime: Date.now(),
     addedBy: 'optimistic' as Id<'users'>,
     tripId,
+    kind,
     ...place,
   };
   // Newest first, like the real list
@@ -48,9 +54,10 @@ const removeOptimistically: OptimisticUpdate<FunctionArgs<typeof api.places.remo
   }
 };
 
-// Adding and removing trip places (removing asks first). Shared by the map's pin pop-up, the
-// places list and the details sheet, so all three behave the same.
-export function usePlaceActions(tripId: Id<'trips'> | undefined) {
+// Adding places to one of the trip's lists (places to visit or sweet spots) and removing them
+// (removing asks first). Shared by the map's pin pop-up, the places list and the details
+// sheet, so all three behave the same.
+export function usePlaceActions(tripId: Id<'trips'> | undefined, kind: PlaceKind) {
   const addPlace = useMutation(api.places.add).withOptimisticUpdate(addOptimistically);
   const removePlace = useMutation(api.places.remove).withOptimisticUpdate(removeOptimistically);
 
@@ -60,6 +67,7 @@ export function usePlaceActions(tripId: Id<'trips'> | undefined) {
       // Only the fields the backend stores; rating and summary are looked up fresh from Google
       await addPlace({
         tripId,
+        kind,
         place: {
           providerPlaceId: place.providerPlaceId,
           name: place.name,
@@ -80,7 +88,8 @@ export function usePlaceActions(tripId: Id<'trips'> | undefined) {
       Alert.alert('Still saving', `${place.name} is being saved. Try again in a moment.`);
       return;
     }
-    Alert.alert(`Remove ${place.name} from your trip?`, 'You can add it again later.', [
+    const { listName } = PLACE_MODES[placeKindOf(place)];
+    Alert.alert(`Remove ${place.name} from ${listName}?`, 'You can add it again later.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Remove',

@@ -18,25 +18,27 @@ const NO_TRIP_REGION: Region = {
 };
 
 // What the map tab shows: the active trip's places, or, while exploring a city found with the
-// search bar, that city's places. Pins are ready to draw; tapping one selects it, which opens
-// its pop-up at the bottom (place-preview-card.tsx).
+// search bar, that city's places; sights or sweet spots, whichever side is switched on. Pins
+// are ready to draw; tapping one selects it, which opens its pop-up at the bottom
+// (place-preview-card.tsx).
 export function useMapPlaces(mapRef: RefObject<MapView | null>) {
-  const { trip, area, saved, suggestions, searchArea } = useTripPlaces();
-  const { add, confirmRemove } = usePlaceActions(trip?._id);
+  const { trip, kind, area, saved, suggestions, searchArea } = useTripPlaces();
+  const { add, confirmRemove } = usePlaceActions(trip?._id, kind);
   const explore = useExploreCity(trip?._id ?? null, area, mapRef);
   const { exploring } = explore;
   const shown = exploring ? explore.suggestions : suggestions;
   // The pin whose pop-up is open. Remembered by key (the Google place ID), so the pop-up stays
-  // with the place while it's added (orange to purple) or removed, and closes by itself when
-  // the pin leaves the map.
+  // with the place while it's saved or removed, and closes by itself when the pin leaves the
+  // map.
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const pins = toPins(saved ?? [], shown.data ?? []);
 
   return {
     // undefined while loading, null when the user has no trip
     trip,
+    kind,
     explore,
-    // The orange pins' search: the explored city's, otherwise the trip's
+    // The suggestion pins' search: the explored city's, otherwise the trip's
     shown,
     shownArea: exploring?.area ?? area,
     searchShownArea: exploring ? explore.searchArea : searchArea,
@@ -46,7 +48,7 @@ export function useMapPlaces(mapRef: RefObject<MapView | null>) {
     selectedKey,
     selected: pins.find((pin) => pin.key === selectedKey),
     select: setSelectedKey,
-    // The pop-up's buttons. Adding needs no confirmation (the pin turns purple at once and one
+    // The pop-up's buttons. Adding needs no confirmation (the pin changes colour at once and one
     // tap undoes it); removing asks first, since the place may be planned on itinerary days.
     addPin: (pin: Pin) => {
       if (pin.suggestion) void add(pin.suggestion);

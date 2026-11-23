@@ -1,6 +1,6 @@
 import { ConvexError, v } from 'convex/values';
 import { action, type ActionCtx } from './_generated/server';
-import { coordinates, type Coordinates } from './schema';
+import { coordinates, placeKind, type Coordinates, type PlaceKind } from './schema';
 
 // Google Places API (New), called from our backend so the API key never ships inside the app.
 // Set the key once per deployment: npx convex env set GOOGLE_MAPS_API_KEY <key>
@@ -60,20 +60,49 @@ export type PlaceDetails = SuggestedPlace & {
   reviews: PlaceReview[];
 };
 
-// What a traveller would visit: culture, landmarks, viewpoints and parks. Names from Google's
-// "Table A" place types.
-const ATTRACTION_TYPES = [
-  'tourist_attraction',
-  'museum',
-  'art_gallery',
-  'historical_landmark',
-  'monument',
-  'castle',
-  'church',
-  'observation_deck',
-  'park',
-  'botanical_garden',
-];
+// What each side of the app searches Google for. Names from Google's "Table A" place types
+// (an unknown name makes Google reject the whole search).
+const PLACE_TYPES: Record<PlaceKind, string[]> = {
+  // What a traveller would visit: culture, landmarks, viewpoints and parks
+  sight: [
+    'tourist_attraction',
+    'museum',
+    'art_gallery',
+    'historical_landmark',
+    'monument',
+    'castle',
+    'church',
+    'observation_deck',
+    'park',
+    'botanical_garden',
+  ],
+  // Sweet spots: bakeries, cafes, brunch and desserts
+  sweet: [
+    'bakery',
+    'pastry_shop',
+    'cake_shop',
+    'cafe',
+    'coffee_shop',
+    'tea_house',
+    'breakfast_restaurant',
+    'brunch_restaurant',
+    'dessert_shop',
+    'dessert_restaurant',
+    'ice_cream_shop',
+    'donut_shop',
+    'chocolate_shop',
+    'confectionery',
+  ],
+};
+
+// Sweet spots must be loved by many: rated above 4.0 by more than 50 people. A lone 5-star
+// review says little, and there are plenty of cafes to choose from.
+const SWEET_MIN_RATING = 4.0;
+const SWEET_MIN_REVIEWS = 50;
+
+function isWellRated(place: SuggestedPlace): boolean {
+  return (place.rating ?? 0) > SWEET_MIN_RATING && (place.ratingCount ?? 0) > SWEET_MIN_REVIEWS;
+}
 
 // rating and userRatingCount make this the "Nearby Search Enterprise" price tier, and
 // editorialSummary (the short description) "Enterprise + Atmosphere": 1,000 free calls a month
@@ -183,14 +212,23 @@ export const destinationDetails = action({
   },
 });
 
-// The most popular places to visit within `radiusMeters` of `center`, at most 20
-export const nearbyAttractions = action({
-  args: { center: coordinates, radiusMeters: v.number() },
-  handler: async (ctx, { center, radiusMeters }): Promise<SuggestedPlace[]> => {
+// The most popular places of one kind within `radiusMeters` of `center`, at most 20. Sweet
+// spots are then narrowed to the well-rated ones, so there can be fewer.
+//
+// Sights match any of a place's types (a park that's also a tourist attraction counts). Sweet
+// spots must be one of those types first and foremost (its primary type): supermarkets and
+// petrol stations also carry "bakery" or "cafe" among their types.
+export const nearbyPlaces = action({
+  args: { center: coordinates, radiusMeters: v.number(), kind: placeKind },
+  handler: async (ctx, { center, radiusMeters, kind }): Promise<SuggestedPlace[]> => {
+    const types =
+      kind === 'sweet'
+        ? { includedPrimaryTypes: PLACE_TYPES.sweet }
+        : { includedTypes: PLACE_TYPES.sight };
     const data = await placesRequest<{ places?: GooglePlace[] }>(ctx, 'places:searchNearby', {
       fieldMask: NEARBY_FIELDS,
       body: {
-        includedTypes: ATTRACTION_TYPES,
+        ...types,
         maxResultCount: 20,
         rankPreference: 'POPULARITY',
         locationRestriction: {
@@ -199,7 +237,7 @@ export const nearbyAttractions = action({
         },
       },
     });
-    return (data.places ?? []).flatMap((place) =>
+    const places = (data.places ?? []).flatMap((place) =>
       place.location && place.displayName
         ? [
             {
@@ -218,6 +256,7 @@ export const nearbyAttractions = action({
           ]
         : [],
     );
+    return kind === 'sweet' ? places.filter(isWellRated) : places;
   },
 });
 

@@ -5,6 +5,7 @@ import { Text } from '@/components/ui/text';
 import { useRouter } from 'expo-router';
 import { LandmarkIcon, MapIcon, MapPinIcon, Trash2Icon } from 'lucide-react-native';
 import { View } from 'react-native';
+import { savedCounts } from '../saved-counts';
 import { formatDateRange, tripStatus } from '../trip-dates';
 import type { TripSummary } from '../types';
 
@@ -37,8 +38,7 @@ export function ActiveTripCard({ trip, today, onDelete }: ActiveTripCardProps) {
               </Text>
             </View>
             <Text variant="muted">
-              {formatDateRange(trip.startDate, trip.endDate)} ·{' '}
-              {trip.placeCount === 1 ? '1 place saved' : `${trip.placeCount} places saved`}
+              {formatDateRange(trip.startDate, trip.endDate)} · {savedCounts(trip)}
             </Text>
           </View>
           {trip.role === 'owner' ? (

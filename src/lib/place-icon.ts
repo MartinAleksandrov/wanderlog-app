@@ -1,8 +1,14 @@
 import {
   BinocularsIcon,
   BookOpenIcon,
+  CakeSliceIcon,
   CastleIcon,
   ChurchIcon,
+  CoffeeIcon,
+  CroissantIcon,
+  DonutIcon,
+  EggFriedIcon,
+  IceCreamConeIcon,
   LandmarkIcon,
   MusicIcon,
   PaletteIcon,
@@ -13,8 +19,15 @@ import {
 } from 'lucide-react-native';
 
 // Which icon stands for which kind of place, matched against words in Google's place type
-// ("City Park", "Art gallery", "Scenic Spot"…). The first match wins.
+// ("City Park", "Art gallery", "Coffee Shop"…). The first match wins, so sweet spots come
+// first: "Coffee Shop" is a cup, not the shop icon further down.
 const ICONS: [words: string[], icon: LucideIcon][] = [
+  [['ice cream', 'gelato'], IceCreamConeIcon],
+  [['donut', 'doughnut'], DonutIcon],
+  [['breakfast', 'brunch'], EggFriedIcon],
+  [['coffee', 'cafe', 'café', 'tea house', 'espresso'], CoffeeIcon],
+  [['bakery', 'pastry', 'croissant', 'bagel'], CroissantIcon],
+  [['cake', 'dessert', 'chocolate', 'confection', 'sweet', 'candy'], CakeSliceIcon],
   [['castle', 'palace', 'fortress'], CastleIcon],
   [['church', 'cathedral', 'chapel', 'mosque', 'synagogue', 'temple', 'shrine'], ChurchIcon],
   [['park', 'garden', 'forest', 'zoo'], TreesIcon],

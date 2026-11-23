@@ -2,10 +2,11 @@ import { ConvexError, v } from 'convex/values';
 import type { Doc } from './_generated/dataModel';
 import { mutation, query, type QueryCtx } from './_generated/server';
 import { getCurrentUser, getTripRole, requireTripRole, requireUser } from './lib/permissions';
+import { placeKindOf } from './places';
 import { coordinates } from './schema';
 
-// Every trip the caller is a member of, latest start date first, with their role and the
-// number of saved places (shown on the home screen).
+// Every trip the caller is a member of, latest start date first, with their role and how many
+// places to visit and sweet spots are saved (shown on the home screen).
 export const list = query({
   args: {},
   handler: async (ctx) => {
@@ -24,7 +25,13 @@ export const list = query({
           .query('places')
           .withIndex('by_trip', (q) => q.eq('tripId', trip._id))
           .collect();
-        return { ...trip, role: membership.role, placeCount: places.length };
+        const sweetCount = places.filter((place) => placeKindOf(place) === 'sweet').length;
+        return {
+          ...trip,
+          role: membership.role,
+          placeCount: places.length - sweetCount,
+          sweetCount,
+        };
       }),
     );
     return trips

@@ -14,7 +14,8 @@ type MapStatusProps = {
   // The area the orange pins were searched in, and what the map shows now
   searchedArea: SearchArea;
   region: Region | null;
-  placeCount: number;
+  // "20 places" / "14 sweet spots"
+  countLabel: string;
   isLoading: boolean;
   error: Error | null;
   onRetry: () => void;
@@ -28,7 +29,7 @@ export function MapStatus({
   title,
   searchedArea,
   region,
-  placeCount,
+  countLabel,
   isLoading,
   error,
   onRetry,
@@ -42,11 +43,7 @@ export function MapStatus({
         <Text className="font-semibold" numberOfLines={1}>
           {title}
         </Text>
-        {isLoading ? (
-          <ActivityIndicator size="small" />
-        ) : (
-          <Text variant="muted">{placeCount} places</Text>
-        )}
+        {isLoading ? <ActivityIndicator size="small" /> : <Text variant="muted">{countLabel}</Text>}
       </View>
       {visibleArea && !isLoading && hasMovedAway(searchedArea, visibleArea) ? (
         <Button

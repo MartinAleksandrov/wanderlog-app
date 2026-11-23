@@ -1,10 +1,12 @@
 import { v } from 'convex/values';
 import { mutation, query } from './_generated/server';
 import { getCurrentUser, getTripRole, requireTripRole, requireUser } from './lib/permissions';
-import { coordinates } from './schema';
+import type { Doc } from './_generated/dataModel';
+import { coordinates, placeKind, type PlaceKind } from './schema';
 
-// The places saved to a trip, newest first: the purple pins on the map. An empty list (not an
-// error) when the caller can't see the trip, e.g. right after it was deleted while on screen.
+// The places saved to a trip, both lists, newest first: the saved pins on the map (each list
+// shows its own, by `kind`). An empty list (not an error) when the caller can't see the trip,
+// e.g. right after it was deleted while on screen.
 export const listForTrip = query({
   args: { tripId: v.id('trips') },
   handler: async (ctx, { tripId }) => {
@@ -20,11 +22,13 @@ export const listForTrip = query({
   },
 });
 
-// Saves a suggested place to a trip. Editors and owners only. Saving the same Google place
-// twice returns the existing row instead of adding a duplicate pin.
+// Saves a suggested place to one of a trip's lists (places to visit or sweet spots). Editors and
+// owners only. Saving the same Google place to the same list twice returns the existing row
+// instead of adding a duplicate pin; a cafe may be on both lists.
 export const add = mutation({
   args: {
     tripId: v.id('trips'),
+    kind: placeKind,
     place: v.object({
       providerPlaceId: v.string(),
       name: v.string(),
@@ -34,7 +38,7 @@ export const add = mutation({
       category: v.optional(v.string()),
     }),
   },
-  handler: async (ctx, { tripId, place }) => {
+  handler: async (ctx, { tripId, kind, place }) => {
     const user = await requireUser(ctx);
     await requireTripRole(ctx, user._id, tripId, 'editor');
 
@@ -43,12 +47,19 @@ export const add = mutation({
       .query('places')
       .withIndex('by_trip', (q) => q.eq('tripId', tripId))
       .collect();
-    const existing = saved.find((p) => p.providerPlaceId === place.providerPlaceId);
+    const existing = saved.find(
+      (p) => p.providerPlaceId === place.providerPlaceId && placeKindOf(p) === kind,
+    );
     if (existing !== undefined) return existing._id;
 
-    return await ctx.db.insert('places', { tripId, addedBy: user._id, ...place });
+    return await ctx.db.insert('places', { tripId, addedBy: user._id, kind, ...place });
   },
 });
+
+// Which list a saved place is on. Places saved before sweet spots existed have no kind.
+export function placeKindOf(place: Doc<'places'>): PlaceKind {
+  return place.kind ?? 'sight';
+}
 
 // Removes a place from its trip, and from the itinerary days it was planned on
 export const remove = mutation({

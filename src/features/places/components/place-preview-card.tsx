@@ -3,12 +3,12 @@ import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { errorMessage } from '@/lib/error-message';
+import { cn } from '@/lib/utils';
 import { api } from '@convex/_generated/api';
 import { skipToken, useQuery as useCachedQuery } from '@tanstack/react-query';
 import { useAction } from 'convex/react';
 import { useFocusEffect, useRouter } from 'expo-router';
 import {
-  CheckIcon,
   ChevronRightIcon,
   PlaneTakeoffIcon,
   PlusIcon,
@@ -25,10 +25,14 @@ import {
   View,
 } from 'react-native';
 import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
+import type { PlaceMode } from '../place-modes';
+import { DirectionsButton } from './directions-button';
 import type { Pin } from './pin-layer';
 
 type PlacePreviewCardProps = {
   pin: Pin;
+  // Sights or sweet spots: the card's colours, words and saved mark
+  mode: PlaceMode;
   // Set while exploring another city: its places can't join the current trip, so the main
   // button offers to plan a trip there instead
   exploringCity?: string;
@@ -39,14 +43,17 @@ type PlacePreviewCardProps = {
 };
 
 // The pop-up at the bottom of the map for the tapped pin: the place's photos (swipe for more),
-// rating, Google's short description, and one main button: "Add to trip" for a suggestion,
-// "Remove from trip" for a place already in the trip, or "Plan a trip" while exploring another
-// city. "Details" opens the full sheet with hours, contact details and reviews.
+// rating, Google's short description, and the buttons:
+// - the main one: save a suggestion ("Add to trip" / "Save sweet spot"), remove a saved place,
+//   or "Plan a trip" while exploring another city
+// - Directions: the blue Google Maps arrow, opens turn-by-turn directions to the place
+// - Details: the full sheet with hours, contact details and reviews
 //
 // It floats a little above the bottom edge so Google's logo (bottom left) stays visible, which
 // Google requires. Android's back button closes it before leaving the screen.
 export function PlacePreviewCard({
   pin,
+  mode,
   exploringCity,
   onAdd,
   onRemove,
@@ -71,12 +78,13 @@ export function PlacePreviewCard({
     }, [onClose]),
   );
 
-  // The full details sheet. Name and photo go along so its top shows at once.
+  // The full details sheet. Name and photo go along so its top shows at once, and the side,
+  // so its button saves to the same list.
   function openDetails() {
     if (placeId === undefined) return;
     router.push({
       pathname: '/place/[placeId]',
-      params: { placeId, name: pin.name, photoName: pin.photoName ?? '' },
+      params: { placeId, name: pin.name, photoName: pin.photoName ?? '', kind: mode.kind },
     });
   }
 
@@ -86,7 +94,7 @@ export function PlacePreviewCard({
       exiting={FadeOutDown.duration(160)}
       style={styles.position}
     >
-      <View className="gap-3 rounded-3xl border border-border bg-background p-3 shadow-lg">
+      <View className={cn('gap-3 rounded-3xl border bg-background p-3 shadow-lg', mode.cardBorder)}>
         <View className="flex-row items-start gap-2 pl-1">
           <View className="flex-1 gap-1">
             <Text className="text-lg leading-6 font-semibold" numberOfLines={2}>
@@ -98,7 +106,7 @@ export function PlacePreviewCard({
                 <RatingText rating={place.rating} ratingCount={place.ratingCount} />
               ) : null}
               {details.isLoading ? <ActivityIndicator size="small" /> : null}
-              {pin.saved ? <InTripBadge /> : null}
+              {pin.saved ? <SavedTag mode={mode} /> : null}
             </View>
           </View>
           <Button
@@ -130,10 +138,14 @@ export function PlacePreviewCard({
         <View className="flex-row gap-2">
           <MainAction
             pin={pin}
+            mode={mode}
             exploringCity={exploringCity}
             onAdd={onAdd}
             onRemove={onRemove}
             onPlanTrip={onPlanTrip}
+          />
+          <DirectionsButton
+            destination={{ name: pin.name, coordinates: pin.coordinates, providerPlaceId: placeId }}
           />
           <Button variant="outline" disabled={placeId === undefined} onPress={openDetails}>
             <Text>Details</Text>
@@ -160,20 +172,23 @@ function usePinPlace(pin: Pin) {
   return { place: pin.suggestion ?? details.data, details };
 }
 
-// The card's main button: remove a trip place, plan a trip to an explored city, or add a
-// suggestion to the trip (orange, like its pin)
+// The card's main button: remove a saved place, plan a trip to an explored city, or save a
+// suggestion (in the suggestion pins' colour)
 function MainAction({
   pin,
+  mode,
   exploringCity,
   onAdd,
   onRemove,
   onPlanTrip,
-}: Pick<PlacePreviewCardProps, 'pin' | 'exploringCity' | 'onAdd' | 'onRemove' | 'onPlanTrip'>) {
+}: Omit<PlacePreviewCardProps, 'onClose'>) {
   if (pin.saved) {
     return (
       <Button variant="outline" className="flex-1" onPress={onRemove}>
         <Icon as={Trash2Icon} className="size-4 text-destructive" />
-        <Text className="text-destructive">Remove from trip</Text>
+        <Text numberOfLines={1} className="shrink text-destructive">
+          {mode.removeLabel}
+        </Text>
       </Button>
     );
   }
@@ -189,12 +204,14 @@ function MainAction({
   }
   return (
     <Button
-      className="flex-1 bg-orange-500 active:bg-orange-600"
+      className={cn('flex-1', mode.addButton)}
       disabled={pin.suggestion === undefined}
       onPress={onAdd}
     >
       <Icon as={PlusIcon} className="size-4 text-white" />
-      <Text className="text-white">Add to trip</Text>
+      <Text numberOfLines={1} className="shrink text-white">
+        {mode.addLabel}
+      </Text>
     </Button>
   );
 }
@@ -209,18 +226,12 @@ function RatingText({ rating, ratingCount }: { rating: number; ratingCount?: num
   );
 }
 
-// The purple "In your trip" tag, matching the pin's colour and check mark
-function InTripBadge() {
+// The "✓ In your trip" / "♥ Saved" tag, matching the saved pin's mark
+function SavedTag({ mode }: { mode: PlaceMode }) {
   return (
-    <View className="flex-row items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 dark:bg-purple-950">
-      <Icon
-        as={CheckIcon}
-        strokeWidth={3}
-        className="size-3 text-purple-600 dark:text-purple-300"
-      />
-      <Text className="text-xs font-semibold text-purple-700 dark:text-purple-300">
-        In your trip
-      </Text>
+    <View className={cn('flex-row items-center gap-1 rounded-full px-2 py-0.5', mode.tag)}>
+      <Icon as={mode.savedIcon} strokeWidth={3} className={cn('size-3', mode.tagText)} />
+      <Text className={cn('text-xs font-semibold', mode.tagText)}>{mode.savedLabel}</Text>
     </View>
   );
 }
