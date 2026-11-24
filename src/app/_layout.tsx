@@ -139,6 +139,10 @@ function RootNavigator() {
             name="new-trip"
             options={{ presentation: 'modal', headerShown: true, title: 'Choose your next trip' }}
           />
+          <Stack.Screen
+            name="edit-trip/[tripId]"
+            options={{ presentation: 'modal', headerShown: true, title: 'Edit trip' }}
+          />
           {/* Slides up from the bottom: 60% of the screen first, drag up for the full height.
             Sheets have no header; the screen draws its own title. */}
           <Stack.Screen

@@ -10,7 +10,7 @@ import { getCurrentUser, getTripRole, requireTripRole, requireUser } from './lib
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 // How many days a trip has, first and last included. Its dates are 'YYYY-MM-DD'.
-export function tripDayCount(trip: Doc<'trips'>): number {
+export function tripDayCount(trip: Pick<Doc<'trips'>, 'startDate' | 'endDate'>): number {
   const start = Date.parse(`${trip.startDate}T00:00:00Z`);
   const end = Date.parse(`${trip.endDate}T00:00:00Z`);
   return Math.round((end - start) / DAY_MS) + 1;
