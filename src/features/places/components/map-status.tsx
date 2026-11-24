@@ -20,7 +20,7 @@ type MapStatusProps = {
   error: Error | null;
   onRetry: () => void;
   onSearchArea: (area: SearchArea) => void;
-  // Set when few places were found: "Search 10 km around", which doubles the radius
+  // Set when few places were found: "Search 10 km wide", which doubles the area
   wider?: { label: string; onPress: () => void };
 };
 

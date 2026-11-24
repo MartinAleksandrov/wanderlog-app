@@ -59,7 +59,7 @@ export function useMapPlaces(mapRef: RefObject<MapView | null>) {
     shown,
     shownArea,
     searchShownArea,
-    // Few places found (a small town): offer the same search over twice the radius, flying the
+    // Few places found (a small town): offer the same search twice as wide and high, flying the
     // map out to show it. null once the search is as wide as Google allows.
     widerArea,
     searchWider: () => {

@@ -83,7 +83,7 @@ export function PlacesScreen() {
 
   const { savedRows, suggestedRows } = toRows(saved ?? [], suggestions.data ?? [], now);
   const filters = { filter, openNow };
-  // Closest first when distances are known; otherwise Google's order
+  // Closest first when distances are known; otherwise the backend's order (most reviewed first)
   const inOrder = (rows: Row[]) => {
     const shown = rows.filter((row) => passesFilters(row, filters));
     if (distanceTo === null) return shown;
@@ -163,7 +163,7 @@ export function PlacesScreen() {
               mode={mode}
               suggestions={suggestions}
               onSearchWider={widerArea ? () => searchArea(widerArea) : undefined}
-              widerKm={widerArea ? Math.round(widerArea.radiusMeters / 1000) : 0}
+              widerKm={widerArea ? Math.round(widerArea.widthMeters / 1000) : 0}
             />
           }
         />
@@ -243,7 +243,7 @@ function ListFooter({
       </Text>
       <Button variant="outline" onPress={onSearchWider}>
         <Icon as={ExpandIcon} className="size-4" />
-        <Text>Search {widerKm} km around</Text>
+        <Text>Search {widerKm} km wide</Text>
       </Button>
     </View>
   );

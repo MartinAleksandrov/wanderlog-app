@@ -1,4 +1,4 @@
-import { ConvexError, v } from 'convex/values';
+import { ConvexError, v, type Infer } from 'convex/values';
 import { action, type ActionCtx } from './_generated/server';
 import { coordinates, placeKind, type Coordinates, type PlaceKind } from './schema';
 
@@ -253,54 +253,170 @@ export const destinationDetails = action({
   },
 });
 
-// The most popular places of one kind within `radiusMeters` of `center`, at most 20. Sweet
-// spots are then narrowed to the well-rated ones, so there can be fewer.
+// Where to look for places: the rectangle the map shows (its centre, width and height)
+export const searchArea = v.object({
+  center: coordinates,
+  widthMeters: v.number(),
+  heightMeters: v.number(),
+});
+export type SearchArea = Infer<typeof searchArea>;
+
+// Google's Nearby Search returns at most 20 places and has no "next page"
+const PLACES_PER_SEARCH = 20;
+// The most places one search shows: enough to fill the map, few enough to keep it readable
+const MAX_PLACES = 30;
+// Nearby Search takes circles of up to 50 km
+const MAX_RADIUS_METERS = 50_000;
+
+// The most popular places of one kind on the map's rectangle, at most 30, most reviewed first.
+//
+// One search (20 places, in a circle) leaves the map half empty: much of the circle is off the
+// screen, and the sweet spots' rating rule drops more. So the rectangle is split into four
+// quarters, each searched on its own (four calls at once), and only places inside the rectangle
+// are kept. Taking each quarter's best in turn spreads the pins over the whole map instead of
+// only the busy centre.
 //
 // Sights match any of a place's types (a park that's also a tourist attraction counts). Sweet
 // spots must be one of those types first and foremost (its primary type): supermarkets and
 // petrol stations also carry "bakery" or "cafe" among their types.
 export const nearbyPlaces = action({
-  args: { center: coordinates, radiusMeters: v.number(), kind: placeKind },
-  handler: async (ctx, { center, radiusMeters, kind }): Promise<SuggestedPlace[]> => {
+  args: { area: searchArea, kind: placeKind },
+  handler: async (ctx, { area: requested, kind }): Promise<SuggestedPlace[]> => {
+    const area = searchableArea(requested);
     const types =
       kind === 'sweet'
         ? { includedPrimaryTypes: PLACE_TYPES.sweet }
         : { includedTypes: PLACE_TYPES.sight };
-    const data = await placesRequest<{ places?: GooglePlace[] }>(ctx, 'places:searchNearby', {
-      fieldMask: NEARBY_FIELDS,
-      body: {
-        ...types,
-        maxResultCount: 20,
-        rankPreference: 'POPULARITY',
-        locationRestriction: {
-          // Google accepts a radius up to 50 km
-          circle: { center, radius: Math.min(Math.max(radiusMeters, 500), 50_000) },
-        },
-      },
-    });
-    const places = (data.places ?? []).flatMap((place) =>
-      place.location && place.displayName
-        ? [
-            {
-              providerPlaceId: place.id,
-              name: place.displayName.text,
-              coordinates: place.location,
-              address: place.shortFormattedAddress,
-              photoName: place.photos?.[0]?.name,
-              // Already in the answer (places.photos), so the pop-up's photos cost no extra call
-              photoNames: (place.photos ?? []).slice(0, MAX_PHOTOS).map((photo) => photo.name),
-              category: place.primaryTypeDisplayName?.text,
-              rating: place.rating,
-              ratingCount: place.userRatingCount,
-              summary: place.editorialSummary?.text,
-              hours: hoursOf(place),
-            },
-          ]
-        : [],
+    const answers = await Promise.allSettled(
+      quarterCircles(area).map((circle) =>
+        placesRequest<{ places?: GooglePlace[] }>(ctx, 'places:searchNearby', {
+          fieldMask: NEARBY_FIELDS,
+          body: {
+            ...types,
+            maxResultCount: PLACES_PER_SEARCH,
+            rankPreference: 'POPULARITY',
+            locationRestriction: { circle },
+          },
+        }),
+      ),
     );
-    return kind === 'sweet' ? places.filter(isWellRated) : places;
+    // One quarter failing (a timeout) still leaves the other quarters' places to show. Only when
+    // all four fail does the app get the error.
+    const found = answers.flatMap((answer) =>
+      answer.status === 'fulfilled' ? [answer.value] : [],
+    );
+    const failed = answers.find((answer) => answer.status === 'rejected');
+    if (found.length === 0 && failed) throw failed.reason;
+
+    const perQuarter = found.map((data) =>
+      (data.places ?? [])
+        .flatMap(toSuggestedPlace)
+        .filter((place) => isInside(area, place.coordinates))
+        .filter((place) => kind !== 'sweet' || isWellRated(place)),
+    );
+    // A popular place near the middle is found by several quarters: keep it once, in its first
+    // spot (a Map keeps the order things were added in)
+    const unique = new Map<string, SuggestedPlace>();
+    for (const place of takeInTurn(perQuarter)) {
+      if (!unique.has(place.providerPlaceId)) unique.set(place.providerPlaceId, place);
+    }
+    // The quarters chose which places to keep; the places list shows them most reviewed first
+    return [...unique.values()]
+      .slice(0, MAX_PLACES)
+      .sort((a, b) => (b.ratingCount ?? 0) - (a.ratingCount ?? 0));
   },
 });
+
+// One of Google's places as a suggestion, or nothing when Google left out where it is
+function toSuggestedPlace(place: GooglePlace): SuggestedPlace[] {
+  if (!place.location || !place.displayName) return [];
+  return [
+    {
+      providerPlaceId: place.id,
+      name: place.displayName.text,
+      coordinates: place.location,
+      address: place.shortFormattedAddress,
+      photoName: place.photos?.[0]?.name,
+      // Already in the answer (places.photos), so the pop-up's photos cost no extra call
+      photoNames: (place.photos ?? []).slice(0, MAX_PHOTOS).map((photo) => photo.name),
+      category: place.primaryTypeDisplayName?.text,
+      rating: place.rating,
+      ratingCount: place.userRatingCount,
+      summary: place.editorialSummary?.text,
+      hours: hoursOf(place),
+    },
+  ];
+}
+
+// The first of every list, then the second of every list, and so on
+function takeInTurn<T>(lists: T[][]): T[] {
+  const longest = Math.max(0, ...lists.map((list) => list.length));
+  return Array.from({ length: longest }, (_, i) =>
+    lists.flatMap((list) => list.slice(i, i + 1)),
+  ).flat();
+}
+
+// Metres to degrees and back. A degree of latitude is about 111 km; a degree of longitude gets
+// narrower away from the equator. Plenty precise at city size.
+const METERS_PER_DEGREE = 111_000;
+function metersPerLongitudeDegree(latitude: number): number {
+  return METERS_PER_DEGREE * Math.cos((latitude * Math.PI) / 180);
+}
+
+// The radius of the smallest circle around one quarter of the rectangle
+function quarterRadius({ widthMeters, heightMeters }: SearchArea): number {
+  return Math.hypot(widthMeters / 4, heightMeters / 4);
+}
+
+// The map zoomed out to a whole country is too big for four 50 km circles: search the middle of
+// it instead, the biggest rectangle of the same shape that they cover
+function searchableArea(area: SearchArea): SearchArea {
+  const scale = MAX_RADIUS_METERS / quarterRadius(area);
+  if (scale >= 1) return area;
+  return {
+    center: area.center,
+    widthMeters: area.widthMeters * scale,
+    heightMeters: area.heightMeters * scale,
+  };
+}
+
+// Longitudes run from -180 to 180: 190 degrees east is -170
+function wrapLongitude(degrees: number): number {
+  return ((((degrees + 180) % 360) + 360) % 360) - 180;
+}
+
+// The four quarters of the rectangle, each as the smallest circle around it (Nearby Search only
+// takes circles)
+function quarterCircles(area: SearchArea) {
+  const { center, widthMeters, heightMeters } = area;
+  const east = widthMeters / 4;
+  const north = heightMeters / 4;
+  const radius = Math.max(quarterRadius(area), 100);
+  // West or east (x), south or north (y) of the centre
+  const quarters = [
+    [-1, -1],
+    [-1, 1],
+    [1, -1],
+    [1, 1],
+  ] as const;
+  return quarters.map(([x, y]) => ({
+    center: {
+      latitude: Math.min(Math.max(center.latitude + (y * north) / METERS_PER_DEGREE, -90), 90),
+      longitude: wrapLongitude(
+        center.longitude + (x * east) / metersPerLongitudeDegree(center.latitude),
+      ),
+    },
+    radius,
+  }));
+}
+
+// Whether a point is on the rectangle (the quarters' circles reach past its edges)
+function isInside({ center, widthMeters, heightMeters }: SearchArea, point: Coordinates): boolean {
+  const north = (point.latitude - center.latitude) * METERS_PER_DEGREE;
+  const east =
+    wrapLongitude(point.longitude - center.longitude) * metersPerLongitudeDegree(center.latitude);
+  return Math.abs(north) <= heightMeters / 2 && Math.abs(east) <= widthMeters / 2;
+}
 
 // More about one place, for the pop-up that opens when a place is tapped
 export const placeDetails = action({

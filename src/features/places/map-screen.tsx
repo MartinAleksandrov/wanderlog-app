@@ -237,7 +237,7 @@ function PlacesOverlay({
               wider={
                 isSparse && widerArea
                   ? {
-                      label: `Search ${Math.round(widerArea.radiusMeters / 1000)} km around`,
+                      label: `Search ${Math.round(widerArea.widthMeters / 1000)} km wide`,
                       onPress: places.searchWider,
                     }
                   : undefined
