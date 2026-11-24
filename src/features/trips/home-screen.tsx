@@ -83,7 +83,7 @@ export function HomeScreen() {
               </Button>
             </>
           ) : (
-            <NoTripState message="Pick a city and dates, and Wanderlog suggests the places worth visiting." />
+            <NoTripState message="Pick a city and dates, and Wandr suggests the places worth visiting." />
           )}
 
           <TripList title="Current and upcoming" trips={upcoming} onSelect={selectTrip} />

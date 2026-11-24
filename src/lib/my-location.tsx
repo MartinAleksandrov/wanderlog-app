@@ -15,7 +15,7 @@ type MyLocation = {
   // Where the phone is, or null (no permission, location off, or not found yet)
   coords: Coordinates | null;
   access: LocationAccess;
-  // Shows the system's "Allow Wanderlog to access this device's location?" dialog
+  // Shows the system's "Allow Wandr to access this device's location?" dialog
   enable: () => void;
 };
 

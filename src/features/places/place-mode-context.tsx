@@ -6,7 +6,7 @@ import { PLACE_MODES } from './place-modes';
 
 // Where the side picked last time is kept on the phone. SecureStore is already in the app (Clerk
 // keeps its session there); a one-word setting fits fine.
-const STORAGE_KEY = 'wanderlog.placeKind';
+const STORAGE_KEY = 'wandr.placeKind';
 
 type Filters = Record<PlaceKind, string | null>;
 

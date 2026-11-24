@@ -1,17 +1,17 @@
 {
   "expo": {
-    "name": "Wanderlog",
-    "slug": "wanderlog",
+    "name": "Wandr",
+    "slug": "wandr",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "wanderlog",
+    "scheme": "wandr",
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon"
     },
     "android": {
-      "package": "io.github.martinaleksandrov.wanderlog",
+      "package": "io.github.martinaleksandrov.wandr",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -41,7 +41,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Wanderlog shows how far places are from you.",
+          "locationWhenInUsePermission": "Wandr shows how far places are from you.",
           "motionUsagePermission": false
         }
       ]

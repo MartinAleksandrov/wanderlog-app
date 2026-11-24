@@ -1,7 +1,7 @@
 import { defineSchema, defineTable } from 'convex/server';
 import { v, type Infer } from 'convex/values';
 
-// Wanderlog's data for the first release. How the tables relate:
+// Wandr's data for the first release. How the tables relate:
 //
 //   users ──< tripMembers >── trips ──< places
 //                               │         ▲ (place items point to a place)

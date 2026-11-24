@@ -1,6 +1,6 @@
 ---
 name: verify-change
-description: How to check a Wanderlog change before its PR, spending few tokens - static checks, quick scripts for pure logic, then one emulator pass with screen text and small screenshots. Use when finishing a change, before committing, or when asked to test, run or check the app on the emulator.
+description: How to check a Wandr change before its PR, spending few tokens - static checks, quick scripts for pure logic, then one emulator pass with screen text and small screenshots. Use when finishing a change, before committing, or when asked to test, run or check the app on the emulator.
 ---
 
 # Verify a change cheaply
@@ -28,8 +28,8 @@ Read the screen as text. A screenshot is for judging looks only.
 
 - **A new native dependency** needs `pnpm android` once.
 - **A Metro started before a package was installed** can't resolve it (HTTP 500). Restart Metro.
-- **A failed bundle freezes the app (ANR),** so the dev menu won't open. To point the app at another Metro, write `<map><string name="debug_http_host">10.0.2.2:8082</string></map>` to `shared_prefs/io.github.martinaleksandrov.wanderlog_preferences.xml`, using `adb push` and then `adb shell run-as io.github.martinaleksandrov.wanderlog cp …`. Deleting that file restores 8081.
-- **Black screen after a cold boot:** `adb shell am force-stop io.github.martinaleksandrov.wanderlog`, then `am start -n io.github.martinaleksandrov.wanderlog/.MainActivity`.
+- **A failed bundle freezes the app (ANR),** so the dev menu won't open. To point the app at another Metro, write `<map><string name="debug_http_host">10.0.2.2:8082</string></map>` to `shared_prefs/io.github.martinaleksandrov.wandr_preferences.xml`, using `adb push` and then `adb shell run-as io.github.martinaleksandrov.wandr cp …`. Deleting that file restores 8081.
+- **Black screen after a cold boot:** `adb shell am force-stop io.github.martinaleksandrov.wandr`, then `am start -n io.github.martinaleksandrov.wandr/.MainActivity`.
 - **Git Bash rewrites `/sdcard/...` arguments:** `export MSYS_NO_PATHCONV=1`. The scripts above don't need it.
 - **The app caches Google answers for the session.** After changing `convex/`, restart the app.
 - **A red toast right after an edit** can be hot reload catching a half-made change. Restart the app before treating it as a bug.
