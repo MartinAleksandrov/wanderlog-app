@@ -13,6 +13,8 @@ const NEAR_MARGIN_METERS = 20_000;
 export function useDistanceTo(area: SearchArea | null): ((to: Coordinates) => number) | null {
   const { coords } = useMyLocation();
   if (coords === null || area === null) return null;
-  if (distanceMeters(coords, area.center) > area.radiusMeters + NEAR_MARGIN_METERS) return null;
+  // From the centre to a corner of the area, plus the margin
+  const reach = Math.hypot(area.widthMeters, area.heightMeters) / 2 + NEAR_MARGIN_METERS;
+  if (distanceMeters(coords, area.center) > reach) return null;
   return (to) => distanceMeters(coords, to);
 }

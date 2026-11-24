@@ -7,9 +7,9 @@ import { useRouter } from 'expo-router';
 import { useState, type RefObject } from 'react';
 import { Keyboard } from 'react-native';
 import type MapView from 'react-native-maps';
-import { areaToRegion } from './map-area';
+import { areaToRegion, cityArea } from './map-area';
 import { usePlaceMode } from './place-mode-context';
-import { DEFAULT_RADIUS_METERS, useNearbyPlaces, type SearchArea } from './trip-places';
+import { useNearbyPlaces, type SearchArea } from './trip-places';
 
 // A city found with the map's search bar, shown instead of the trip's city. Remembers which
 // trip was active, so creating a trip from it (which changes the active trip) ends the exploring.
@@ -44,7 +44,7 @@ export function useExploreCity(
     // No `finally`: the React Compiler can't optimize it yet, so both paths reset the spinner
     try {
       const details = await getDestinationDetails({ placeId: destination.placeId });
-      const area = { center: details.coordinates, radiusMeters: DEFAULT_RADIUS_METERS };
+      const area = cityArea(details.coordinates);
       setExplore({ tripId, destination, photoName: details.photoName, area });
       setIsLocating(false);
       mapRef.current?.animateToRegion(areaToRegion(area), 700);

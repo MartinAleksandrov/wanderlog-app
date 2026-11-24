@@ -1,18 +1,18 @@
 import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
-import type { Coordinates, PlaceKind } from '@convex/schema';
+import type { SearchArea } from '@convex/googlePlaces';
+import type { PlaceKind } from '@convex/schema';
 import { skipToken, useQuery as useCachedQuery } from '@tanstack/react-query';
 import { useAction, useQuery } from 'convex/react';
 import { createContext, use, useState, type ReactNode } from 'react';
+import { cityArea } from './map-area';
 import { usePlaceMode } from './place-mode-context';
 import { placeKindOf } from './place-modes';
 
-// Where to look for places: a circle on the map, remembered per trip
-export type SearchArea = { center: Coordinates; radiusMeters: number };
+// Where to look for places: the rectangle the map showed (centre, width and height in metres),
+// remembered per trip
+export type { SearchArea };
 type TripSearchArea = SearchArea & { tripId: Id<'trips'> };
-
-// Big enough to cover a city centre
-export const DEFAULT_RADIUS_METERS = 5000;
 
 const SearchAreaContext = createContext<{
   area: TripSearchArea | null;
@@ -47,11 +47,15 @@ export function useNearbyPlaces(
       kind,
       area?.center.latitude,
       area?.center.longitude,
-      area?.radiusMeters,
+      area?.widthMeters,
+      area?.heightMeters,
     ],
     // Only the fields the backend accepts (a remembered area also carries its tripId)
     queryFn: area
-      ? () => nearbyPlaces({ center: area.center, radiusMeters: area.radiusMeters, kind })
+      ? () => {
+          const { center, widthMeters, heightMeters } = area;
+          return nearbyPlaces({ area: { center, widthMeters, heightMeters }, kind });
+        }
       : skipToken,
     staleTime: Infinity,
     // While a new area loads, keep showing the previous one's places, but only within the same
@@ -82,7 +86,7 @@ export function useTripPlaces() {
     trip && context.area?.tripId === trip._id
       ? context.area
       : trip?.destinationCoordinates
-        ? { center: trip.destinationCoordinates, radiusMeters: DEFAULT_RADIUS_METERS }
+        ? cityArea(trip.destinationCoordinates)
         : null;
 
   const suggestions = useNearbyPlaces(area, trip?._id, kind);
