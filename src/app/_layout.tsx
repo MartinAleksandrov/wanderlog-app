@@ -1,5 +1,6 @@
 import '@/global.css';
 
+import { SignOutButton, SigningInScreen } from '@/features/auth';
 import { env } from '@/lib/env';
 import { installGlobalErrorHandler, reportError } from '@/lib/error-reporting';
 import { NAV_THEME } from '@/lib/theme';
@@ -15,7 +16,7 @@ import { Stack } from 'expo-router';
 import { ThemeProvider } from 'expo-router/react-navigation';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { LogBox } from 'react-native';
 import { useUniwind } from 'uniwind';
 
@@ -100,7 +101,22 @@ export default function RootLayout() {
 // the navigator's anchor, "/", which is itself blocked when signed out: an "Unmatched Route" screen.
 function RootNavigator() {
   const { isLoading, isAuthenticated } = useConvexAuth();
+  // Clerk's own answer comes first: true as soon as a sign-in finishes on the device
+  const { isSignedIn } = useAuth();
   const storeUser = useMutation(api.users.store);
+
+  // Has Convex accepted this user's token since the app started? Reset on sign-out. Updated while
+  // rendering: React's pattern for state that follows other values (no extra render, unlike an effect).
+  const [hadConvexAuth, setHadConvexAuth] = useState(false);
+  if (isAuthenticated && !hadConvexAuth) setHadConvexAuth(true);
+  if (isSignedIn === false && hadConvexAuth) setHadConvexAuth(false);
+
+  // Signed in with Clerk, but Convex hasn't accepted the token yet (a fetch from Clerk and a
+  // check by the Convex server). The guards below still show the sign-in form during that second,
+  // so it's covered. On app start the splash screen sits on top of this state anyway.
+  // Only before the first acceptance: if Convex drops the token later (offline for a few minutes,
+  // so the token refresh failed), the user didn't just sign in, and the guards handle it as before.
+  const finishingSignIn = isSignedIn === true && !isAuthenticated && !hadConvexAuth;
 
   useEffect(() => {
     if (!isLoading) void SplashScreen.hideAsync();
@@ -115,38 +131,44 @@ function RootNavigator() {
   }, [isAuthenticated, storeUser]);
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Protected guard={isAuthenticated} redirectTo="/sign-in">
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen
-          name="new-trip"
-          options={{ presentation: 'modal', headerShown: true, title: 'Choose your next trip' }}
-        />
-        {/* Slides up from the bottom: 60% of the screen first, drag up for the full height.
+    <>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Protected guard={isAuthenticated} redirectTo="/sign-in">
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen
+            name="new-trip"
+            options={{ presentation: 'modal', headerShown: true, title: 'Choose your next trip' }}
+          />
+          {/* Slides up from the bottom: 60% of the screen first, drag up for the full height.
             Sheets have no header; the screen draws its own title. */}
-        <Stack.Screen
-          name="place/[placeId]"
-          options={{
-            presentation: 'formSheet',
-            sheetAllowedDetents: [0.6, 1],
-            sheetGrabberVisible: true,
-            sheetCornerRadius: 24,
-          }}
-        />
-        {/* The plan's "Add places" list, the same kind of sheet */}
-        <Stack.Screen
-          name="add-stops"
-          options={{
-            presentation: 'formSheet',
-            sheetAllowedDetents: [0.6, 1],
-            sheetGrabberVisible: true,
-            sheetCornerRadius: 24,
-          }}
-        />
-      </Stack.Protected>
-      <Stack.Protected guard={!isAuthenticated} redirectTo="/">
-        <Stack.Screen name="(auth)" />
-      </Stack.Protected>
-    </Stack>
+          <Stack.Screen
+            name="place/[placeId]"
+            options={{
+              presentation: 'formSheet',
+              sheetAllowedDetents: [0.6, 1],
+              sheetGrabberVisible: true,
+              sheetCornerRadius: 24,
+            }}
+          />
+          {/* The plan's "Add places" list, the same kind of sheet */}
+          <Stack.Screen
+            name="add-stops"
+            options={{
+              presentation: 'formSheet',
+              sheetAllowedDetents: [0.6, 1],
+              sheetGrabberVisible: true,
+              sheetCornerRadius: 24,
+            }}
+          />
+        </Stack.Protected>
+        <Stack.Protected guard={!isAuthenticated} redirectTo="/">
+          <Stack.Screen name="(auth)" />
+        </Stack.Protected>
+      </Stack>
+      {/* Drawn over the navigator rather than instead of it: Expo Router needs the Stack mounted */}
+      {/* Sign out: if Convex never accepts the token (a broken Clerk JWT template, say), Clerk
+          stays signed in, and signing out is the only way back to a working sign-in form */}
+      {finishingSignIn ? <SigningInScreen slowAction={<SignOutButton />} /> : null}
+    </>
   );
 }
