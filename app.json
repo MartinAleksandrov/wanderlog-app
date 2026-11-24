@@ -33,6 +33,7 @@
       "./plugins/withNetskopeDebugTrust",
       "@clerk/expo",
       "expo-secure-store",
+      "expo-web-browser",
       [
         "expo-location",
         {
