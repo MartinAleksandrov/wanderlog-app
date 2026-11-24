@@ -13,6 +13,6 @@ const width = Number(process.argv[2] ?? 450);
 const png = execFileSync('adb', ['exec-out', 'screencap', '-p'], { maxBuffer: 64 << 20 });
 const image = await Jimp.read(png);
 image.resize(width, Jimp.AUTO);
-const file = join(tmpdir(), 'wanderlog-shot.png');
+const file = join(tmpdir(), 'wandr-shot.png');
 await image.writeAsync(file);
 console.log(file);

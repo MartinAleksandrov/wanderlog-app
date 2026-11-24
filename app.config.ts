@@ -18,8 +18,8 @@ if (!googleMapsApiKey) {
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   // app.json always has these; repeated here because ExpoConfig requires them
-  name: config.name ?? 'Wanderlog',
-  slug: config.slug ?? 'wanderlog',
+  name: config.name ?? 'Wandr',
+  slug: config.slug ?? 'wandr',
   plugins: [
     ...(config.plugins ?? []),
     ['react-native-maps', { androidGoogleMapsApiKey: googleMapsApiKey }],

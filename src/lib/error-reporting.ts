@@ -22,15 +22,15 @@ const globals = globalThis as typeof globalThis & {
   ErrorUtils?: ErrorUtils;
   HermesInternal?: HermesInternal;
   // Set once the handler is installed: hot reload runs the installing module again
-  __wanderlogErrorHandler?: true;
+  __wandrErrorHandler?: true;
 };
 
 // Catches what React error boundaries can't: errors thrown outside rendering (in a button's
 // onPress, a timer, a native callback) and promises that fail without anyone handling them.
 // Error boundaries (src/components/screen-error-boundary.tsx) handle errors while rendering.
 export function installGlobalErrorHandler() {
-  if (globals.__wanderlogErrorHandler || !globals.ErrorUtils) return;
-  globals.__wanderlogErrorHandler = true;
+  if (globals.__wandrErrorHandler || !globals.ErrorUtils) return;
+  globals.__wandrErrorHandler = true;
 
   const errorUtils = globals.ErrorUtils;
   const defaultHandler = errorUtils.getGlobalHandler();

@@ -1,5 +1,5 @@
 {
-  "name": "wanderlog-app",
+  "name": "wandr-app",
   "main": "expo-router/entry",
   "version": "1.0.0",
   "packageManager": "pnpm@10.28.0",

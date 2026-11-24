@@ -12,7 +12,7 @@ import { errorMessage } from '../auth-errors';
 const GOOGLE_LOGO = { uri: 'https://img.clerk.com/static/google.png?width=160' };
 
 // Where Google (via Clerk) sends the user back when they're done in the browser.
-// Our native build: wanderlog://sso-callback (the "scheme" in app.json).
+// Our native build: wandr://sso-callback (the "scheme" in app.json).
 // Expo Go: exp://<laptop IP>:8081/--/sso-callback, which changes with the laptop's Wi-Fi address.
 // Clerk only finishes the sign-in for addresses on its allowlist (Clerk Dashboard → Native
 // applications → Redirect URLs). Expo Router ignores this address: see src/app/+native-intent.tsx.
