@@ -6,7 +6,7 @@ import { Text } from '@/components/ui/text';
 import { useSignUp } from '@clerk/expo';
 import { Link } from 'expo-router';
 import { useRef, useState } from 'react';
-import { Pressable, type TextInput, View } from 'react-native';
+import { Pressable, type TextInputInstance, View } from 'react-native';
 
 import { errorMessage } from '../auth-errors';
 import { EmailCodeForm } from './email-code-form';
@@ -22,8 +22,8 @@ export function SignUpForm() {
   const [password, setPassword] = useState('');
   const [stage, setStage] = useState<Stage>('credentials');
   const [error, setError] = useState<string | null>(null);
-  const emailRef = useRef<TextInput>(null);
-  const passwordRef = useRef<TextInput>(null);
+  const emailRef = useRef<TextInputInstance>(null);
+  const passwordRef = useRef<TextInputInstance>(null);
 
   const busy = fetchStatus === 'fetching';
   const canSubmit = email.trim().length > 0 && password.length > 0 && !busy;

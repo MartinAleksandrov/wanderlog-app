@@ -34,7 +34,7 @@ export function installGlobalErrorHandler() {
 
   const errorUtils = globals.ErrorUtils;
   const defaultHandler = errorUtils.getGlobalHandler();
-  errorUtils.setGlobalHandler((error: unknown, isFatal?: boolean) => {
+  errorUtils.setGlobalHandler((error: unknown, isFatal: boolean) => {
     reportError(error, 'global', isFatal);
     // A non-fatal error in a release build would otherwise pass silently
     if (!__DEV__ && !isFatal) Alert.alert('Something went wrong', 'Please try again.');

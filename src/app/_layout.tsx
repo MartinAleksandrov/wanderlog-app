@@ -96,6 +96,8 @@ export default function RootLayout() {
 // Decides which part of the app exists right now, based on whether Convex has accepted the
 // user's Clerk token (useConvexAuth). Signed in: the tabs. Signed out: the sign-in/sign-up screens.
 // When the state changes (sign in, sign out), the guards flip and Expo Router moves the user.
+// redirectTo says where a blocked route sends the user. Without it Expo Router (SDK 58+) goes to
+// the navigator's anchor, "/", which is itself blocked when signed out: an "Unmatched Route" screen.
 function RootNavigator() {
   const { isLoading, isAuthenticated } = useConvexAuth();
   const storeUser = useMutation(api.users.store);
@@ -114,7 +116,7 @@ function RootNavigator() {
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Protected guard={isAuthenticated}>
+      <Stack.Protected guard={isAuthenticated} redirectTo="/sign-in">
         <Stack.Screen name="(tabs)" />
         <Stack.Screen
           name="new-trip"
@@ -142,7 +144,7 @@ function RootNavigator() {
           }}
         />
       </Stack.Protected>
-      <Stack.Protected guard={!isAuthenticated}>
+      <Stack.Protected guard={!isAuthenticated} redirectTo="/">
         <Stack.Screen name="(auth)" />
       </Stack.Protected>
     </Stack>
