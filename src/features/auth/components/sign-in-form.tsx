@@ -7,7 +7,7 @@ import { Text } from '@/components/ui/text';
 import { useSignIn } from '@clerk/expo';
 import { Link } from 'expo-router';
 import { useRef, useState } from 'react';
-import { Pressable, type TextInput, View } from 'react-native';
+import { Pressable, type TextInputInstance, View } from 'react-native';
 
 import { errorMessage } from '../auth-errors';
 import { EmailCodeForm } from './email-code-form';
@@ -25,8 +25,8 @@ export function SignInForm() {
   const [password, setPassword] = useState('');
   const [stage, setStage] = useState<Stage>('credentials');
   const [error, setError] = useState<string | null>(null);
-  const emailRef = useRef<TextInput>(null);
-  const passwordRef = useRef<TextInput>(null);
+  const emailRef = useRef<TextInputInstance>(null);
+  const passwordRef = useRef<TextInputInstance>(null);
 
   // true while a request to Clerk is in flight; buttons are disabled meanwhile
   const busy = fetchStatus === 'fetching';

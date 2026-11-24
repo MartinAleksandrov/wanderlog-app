@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils';
-import { Platform, TextInput } from 'react-native';
+import { Platform, TextInput, type TextInputInstance } from 'react-native';
 
 // Fixed from the generated Reusables version, which used NativeWind's placeholder syntax:
 // Uniwind sets non-style colors such as the placeholder through `...ColorClassName` props
@@ -8,7 +8,7 @@ function Input({
   className,
   placeholderTextColorClassName,
   ...props
-}: React.ComponentProps<typeof TextInput> & React.RefAttributes<TextInput>) {
+}: React.ComponentProps<typeof TextInput> & React.RefAttributes<TextInputInstance>) {
   return (
     <TextInput
       className={cn(
