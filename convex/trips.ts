@@ -1,6 +1,8 @@
 import { ConvexError, v } from 'convex/values';
 import type { Doc } from './_generated/dataModel';
 import { mutation, query, type QueryCtx } from './_generated/server';
+import { tripDayCount } from './itinerary';
+import { TRIP_NAME_MAX_LENGTH, TRIP_NOTES_MAX_LENGTH } from './lib/limits';
 import { getCurrentUser, getTripRole, requireTripRole, requireUser } from './lib/permissions';
 import { placeKindOf } from './places';
 import { coordinates } from './schema';
@@ -50,6 +52,23 @@ export const active = query({
   },
 });
 
+// One trip with the caller's role (the edit screen). null when it was deleted, or isn't theirs.
+// The ID comes from a URL (/edit-trip/<ID>), so it's a plain string checked here: a malformed one
+// is "not found" too, instead of an argument error that crashes the screen on every retry.
+export const get = query({
+  args: { tripId: v.string() },
+  handler: async (ctx, args) => {
+    const tripId = ctx.db.normalizeId('trips', args.tripId);
+    if (tripId === null) return null;
+    const user = await getCurrentUser(ctx);
+    if (user === null) return null;
+    const role = await getTripRole(ctx, user._id, tripId, 'viewer');
+    if (role === null) return null;
+    const trip = await ctx.db.get('trips', tripId);
+    return trip === null ? null : { ...trip, role };
+  },
+});
+
 // The trip the user picked last; if none, or it was deleted, their newest trip
 async function findActiveTrip(ctx: QueryCtx, user: Doc<'users'>) {
   if (user.activeTripId !== undefined) {
@@ -70,6 +89,24 @@ async function findActiveTrip(ctx: QueryCtx, user: Doc<'users'>) {
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
+// 'YYYY-MM-DD' and a day that exists. Shape alone isn't enough: '2027-02-31' parses, but as
+// 3 March, and '2027-13-01' doesn't parse at all.
+function isCalendarDate(date: string): boolean {
+  if (!ISO_DATE.test(date)) return false;
+  const parsed = Date.parse(`${date}T00:00:00Z`);
+  return !Number.isNaN(parsed) && new Date(parsed).toISOString().startsWith(date);
+}
+
+// The app only sends valid dates; this guards against other callers of the public API
+function requireValidDates(startDate: string, endDate: string) {
+  if (!isCalendarDate(startDate) || !isCalendarDate(endDate)) {
+    throw new ConvexError('Dates must be real days, written like 2027-05-30.');
+  }
+  if (endDate < startDate) {
+    throw new ConvexError('The trip has to end on or after the day it starts.');
+  }
+}
+
 // Creates a trip with the caller as its owner, and makes it the active trip
 export const create = mutation({
   args: {
@@ -82,19 +119,71 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
-    // The app only sends valid dates; this guards against other callers of the public API
-    if (!ISO_DATE.test(args.startDate) || !ISO_DATE.test(args.endDate)) {
-      throw new ConvexError('Dates must look like 2027-05-30.');
-    }
-    if (args.endDate < args.startDate) {
-      throw new ConvexError('The trip has to end on or after the day it starts.');
-    }
+    requireValidDates(args.startDate, args.endDate);
 
     const city = args.destination.split(',')[0]?.trim() || args.destination;
     const tripId = await ctx.db.insert('trips', { name: `Trip to ${city}`, ...args });
     await ctx.db.insert('tripMembers', { tripId, userId: user._id, role: 'owner' });
     await ctx.db.patch('users', user._id, { activeTripId: tripId });
     return tripId;
+  },
+});
+
+// Changes a trip's name, dates and notes. Editors and owners. Empty notes remove them.
+// Plan stops keep their day numbers, so the plan moves along with a new start date. Stops on days
+// past a new, earlier end move to the new last day, after the stops already planned there. A place
+// is planned at most once per day (see itinerary.addPlace), so a moved stop whose place is already
+// on the last day is deleted instead.
+export const update = mutation({
+  args: {
+    tripId: v.id('trips'),
+    name: v.string(),
+    startDate: v.string(),
+    endDate: v.string(),
+    notes: v.string(),
+  },
+  handler: async (ctx, { tripId, startDate, endDate, ...text }) => {
+    const user = await requireUser(ctx);
+    await requireTripRole(ctx, user._id, tripId, 'editor');
+    requireValidDates(startDate, endDate);
+    const name = text.name.trim();
+    const notes = text.notes.trim();
+    if (name === '') throw new ConvexError('Give the trip a name.');
+    if (name.length > TRIP_NAME_MAX_LENGTH) {
+      throw new ConvexError(`Trip names can be up to ${TRIP_NAME_MAX_LENGTH} characters.`);
+    }
+    if (notes.length > TRIP_NOTES_MAX_LENGTH) {
+      throw new ConvexError(`Trip notes can be up to ${TRIP_NOTES_MAX_LENGTH} characters.`);
+    }
+
+    // The new last day and every day after it, in plan order: one index range read
+    const lastDay = tripDayCount({ startDate, endDate });
+    const fromLastDay = await ctx.db
+      .query('itineraryItems')
+      .withIndex('by_trip_and_day_and_order', (q) => q.eq('tripId', tripId).gte('day', lastDay))
+      .collect();
+    const onLastDay = fromLastDay.filter((item) => item.day === lastDay);
+    const plannedPlaces = new Set(
+      onLastDay.flatMap((item) => (item.kind === 'place' ? [item.placeId] : [])),
+    );
+    let order = onLastDay.at(-1)?.order ?? 0;
+    for (const item of fromLastDay.filter((item) => item.day > lastDay)) {
+      if (item.kind === 'place' && plannedPlaces.has(item.placeId)) {
+        await ctx.db.delete('itineraryItems', item._id);
+        continue;
+      }
+      if (item.kind === 'place') plannedPlaces.add(item.placeId);
+      order += 1;
+      await ctx.db.patch('itineraryItems', item._id, { day: lastDay, order });
+    }
+
+    // undefined removes the field from the document
+    await ctx.db.patch('trips', tripId, {
+      name,
+      startDate,
+      endDate,
+      notes: notes === '' ? undefined : notes,
+    });
   },
 });
 

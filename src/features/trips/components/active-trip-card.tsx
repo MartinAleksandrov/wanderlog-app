@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { useRouter } from 'expo-router';
-import { LandmarkIcon, MapIcon, MapPinIcon, Trash2Icon } from 'lucide-react-native';
+import { LandmarkIcon, MapIcon, MapPinIcon, PencilIcon, Trash2Icon } from 'lucide-react-native';
 import { View } from 'react-native';
 import { savedCounts } from '../saved-counts';
 import { formatDateRange, tripStatus } from '../trip-dates';
@@ -41,12 +41,30 @@ export function ActiveTripCard({ trip, today, onDelete }: ActiveTripCardProps) {
               {formatDateRange(trip.startDate, trip.endDate)} · {savedCounts(trip)}
             </Text>
           </View>
+          {/* Editors and owners change the trip; only owners delete it */}
+          {trip.role !== 'viewer' ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              onPress={() =>
+                router.push({ pathname: '/edit-trip/[tripId]', params: { tripId: trip._id } })
+              }
+              aria-label="Edit trip"
+            >
+              <Icon as={PencilIcon} className="text-muted-foreground" />
+            </Button>
+          ) : null}
           {trip.role === 'owner' ? (
             <Button variant="ghost" size="icon" onPress={onDelete} aria-label="Delete trip">
               <Icon as={Trash2Icon} className="text-muted-foreground" />
             </Button>
           ) : null}
         </View>
+        {trip.notes ? (
+          <Text variant="muted" numberOfLines={3}>
+            {trip.notes}
+          </Text>
+        ) : null}
         <View className="flex-row gap-2">
           <Button className="flex-1" onPress={() => router.navigate('/map')}>
             <Icon as={MapIcon} />
