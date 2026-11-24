@@ -1,20 +1,76 @@
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import { Image } from 'react-native';
+import { useSSO } from '@clerk/expo';
+import * as AuthSession from 'expo-auth-session';
+import * as WebBrowser from 'expo-web-browser';
+import { useEffect, useState } from 'react';
+import { Image, Platform, View } from 'react-native';
 
-import { showNotConnectedYet } from '../not-connected-yet';
+import { errorMessage } from '../auth-errors';
 
 // Google's logo, hosted by Clerk (the same image Clerk's own sign-in UI uses)
 const GOOGLE_LOGO = { uri: 'https://img.clerk.com/static/google.png?width=160' };
 
-// "Continue with Google". Not wired yet: Google sign-in needs the app's return address registered
-// in Clerk, and in Expo Go that address contains the laptop's Wi-Fi IP, which keeps changing.
-// It gets connected together with a stable app address in a later step.
+// Where Google (via Clerk) sends the user back when they're done in the browser.
+// Our native build: wanderlog://sso-callback (the "scheme" in app.json).
+// Expo Go: exp://<laptop IP>:8081/--/sso-callback, which changes with the laptop's Wi-Fi address.
+// Clerk only finishes the sign-in for addresses on its allowlist (Clerk Dashboard → Native
+// applications → Redirect URLs). Expo Router ignores this address: see src/app/+native-intent.tsx.
+const REDIRECT_URL = AuthSession.makeRedirectUri({ path: 'sso-callback' });
+
+// Android only: starts the browser (Chrome Custom Tabs) in the background while the sign-in
+// screen is open, so it opens faster on tap. Released again when the screen goes away.
+function useWarmUpBrowser() {
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    void WebBrowser.warmUpAsync();
+    return () => {
+      void WebBrowser.coolDownAsync();
+    };
+  }, []);
+}
+
+// "Continue with Google": signs in, or creates an account on first use. Opens Google's sign-in
+// page in the system browser (Google forbids in-app web views), then Clerk returns a finished
+// session. Activating it is all we do: the root layout notices the session and shows the tabs.
 export function GoogleSignInButton() {
+  useWarmUpBrowser();
+  const { startSSOFlow } = useSSO();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function onPress() {
+    setBusy(true);
+    setError(null);
+    if (__DEV__) console.info('[auth] Google sign-in redirect URL:', REDIRECT_URL);
+
+    // No `finally` below: the React Compiler can't handle it. `catch` takes every error, so the
+    // setBusy(false) after the block always runs.
+    try {
+      const { createdSessionId, setActive, authSessionResult } = await startSSOFlow({
+        strategy: 'oauth_google',
+        redirectUrl: REDIRECT_URL,
+      });
+
+      if (createdSessionId && setActive) {
+        await setActive({ session: createdSessionId });
+      } else if (authSessionResult?.type === 'success') {
+        // Closing the browser or pressing back (type 'cancel'/'dismiss') is a normal choice, not an error
+        setError('Google sign-in could not be completed. Please try again.');
+      }
+    } catch (caught) {
+      setError(errorMessage(caught instanceof Error ? caught : null));
+    }
+    setBusy(false);
+  }
+
   return (
-    <Button variant="outline" onPress={() => showNotConnectedYet('Google sign-in')}>
-      <Image source={GOOGLE_LOGO} className="size-4" accessibilityIgnoresInvertColors />
-      <Text>Continue with Google</Text>
-    </Button>
+    <View className="gap-2">
+      <Button variant="outline" onPress={() => void onPress()} disabled={busy}>
+        <Image source={GOOGLE_LOGO} className="size-4" accessibilityIgnoresInvertColors />
+        <Text>{busy ? 'Waiting for Google…' : 'Continue with Google'}</Text>
+      </Button>
+      {error ? <Text className="text-center text-sm text-destructive">{error}</Text> : null}
+    </View>
   );
 }
