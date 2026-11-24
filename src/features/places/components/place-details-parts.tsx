@@ -2,11 +2,14 @@ import { PlacePhoto } from '@/components/place-photo';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { openLink } from '@/lib/open-link';
+import { useNow } from '@/lib/use-now';
 import { cn } from '@/lib/utils';
 import type { PlaceDetails, PlaceReview } from '@convex/googlePlaces';
 import { ClockIcon, GlobeIcon, MapPinIcon, PhoneIcon, type LucideIcon } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { FlatList, Pressable, useWindowDimensions, View } from 'react-native';
+import { openStatus } from '../open-status';
+import { OpenBadge } from './open-badge';
 
 // The pieces of the place pop-up (place-details-sheet.tsx)
 
@@ -50,8 +53,10 @@ export function PhotoStrip({ photoNames, category }: { photoNames: string[]; cat
   );
 }
 
-// "Market · ★ 4.5 (32,789) · Open now"
+// "Market · ★ 4.5 (32,789) · ● Open · closes 18:00"
 export function PlaceSummaryLine({ place }: { place: PlaceDetails }) {
+  const now = useNow();
+  const status = openStatus(place.hours, now);
   return (
     <View className="flex-row flex-wrap items-center gap-x-2 gap-y-1">
       {place.category ? <Text variant="muted">{place.category}</Text> : null}
@@ -64,16 +69,7 @@ export function PlaceSummaryLine({ place }: { place: PlaceDetails }) {
           ) : null}
         </Text>
       ) : null}
-      {place.openNow === undefined ? null : (
-        <Text
-          className={cn(
-            'text-sm font-semibold',
-            place.openNow ? 'text-green-600' : 'text-destructive',
-          )}
-        >
-          {place.openNow ? 'Open now' : 'Closed now'}
-        </Text>
-      )}
+      {status ? <OpenBadge status={status} /> : null}
     </View>
   );
 }

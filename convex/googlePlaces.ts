@@ -40,6 +40,23 @@ export type SuggestedPlace = {
   rating?: number;
   ratingCount?: number;
   summary?: string;
+  // Missing when Google doesn't know its hours (often parks, squares and landmarks)
+  hours?: PlaceHours;
+};
+
+// Whether a place was open when Google was asked, and when that changes next. The app works out
+// "Open · closes 18:00" from it at the moment it shows it (src/features/places/open-status.ts),
+// so an answer cached an hour ago is still right.
+export type PlaceHours = {
+  openNow: boolean;
+  // While open: when it closes. While closed: when it opens. Up to a week ahead, as an
+  // RFC 3339 time in UTC ("2026-11-23T18:00:00Z"). Missing when it doesn't (open 24 hours,
+  // or closed for good).
+  nextCloseTime?: string;
+  nextOpenTime?: string;
+  // The place's time zone, in minutes from UTC: "closes 18:00" is on the place's clock, even
+  // when the phone is still on home time
+  utcOffsetMinutes?: number;
 };
 
 // A few photos per place: each one shown is a paid request
@@ -54,8 +71,7 @@ export type PlaceDetails = SuggestedPlace & {
   googleMapsUrl?: string;
   website?: string;
   phone?: string;
-  // Whether it's open right now, and this week's hours ("Monday: 9:00 AM – 6:00 PM", …)
-  openNow?: boolean;
+  // This week's hours ("Monday: 9:00 AM – 6:00 PM", …); whether it's open now is in `hours`
   openingHours?: string[];
   reviews: PlaceReview[];
 };
@@ -104,8 +120,11 @@ function isWellRated(place: SuggestedPlace): boolean {
   return (place.rating ?? 0) > SWEET_MIN_RATING && (place.ratingCount ?? 0) > SWEET_MIN_REVIEWS;
 }
 
-// rating and userRatingCount make this the "Nearby Search Enterprise" price tier, and
-// editorialSummary (the short description) "Enterprise + Atmosphere": 1,000 free calls a month
+// Google bills a request at the price tier of its most expensive field. rating, userRatingCount
+// and currentOpeningHours are "Nearby Search Enterprise", utcOffsetMinutes "Pro", and
+// editorialSummary (the short description) "Enterprise + Atmosphere", the highest: so the whole
+// request is Enterprise + Atmosphere (1,000 free calls a month), and the opening hours cost
+// nothing extra.
 const NEARBY_FIELDS = [
   'places.id',
   'places.displayName',
@@ -116,6 +135,8 @@ const NEARBY_FIELDS = [
   'places.rating',
   'places.userRatingCount',
   'places.editorialSummary',
+  'places.currentOpeningHours',
+  'places.utcOffsetMinutes',
 ].join(',');
 
 // The parts of Google's place object that the field masks above ask for
@@ -129,7 +150,27 @@ type GooglePlace = {
   rating?: number;
   userRatingCount?: number;
   editorialSummary?: { text: string };
+  currentOpeningHours?: {
+    openNow?: boolean;
+    nextOpenTime?: string;
+    nextCloseTime?: string;
+    weekdayDescriptions?: string[];
+  };
+  utcOffsetMinutes?: number;
 };
+
+// Only what the app needs from Google's opening hours (the full answer also lists every opening
+// period of the week)
+function hoursOf(place: GooglePlace): PlaceHours | undefined {
+  const hours = place.currentOpeningHours;
+  if (hours?.openNow === undefined) return undefined;
+  return {
+    openNow: hours.openNow,
+    nextOpenTime: hours.nextOpenTime,
+    nextCloseTime: hours.nextCloseTime,
+    utcOffsetMinutes: place.utcOffsetMinutes,
+  };
+}
 
 // The place pop-up's fields. Hours, website and phone are the "Place Details Enterprise" tier,
 // editorialSummary and reviews "Enterprise + Atmosphere": 1,000 free calls a month. The app
@@ -145,6 +186,7 @@ const DETAILS_FIELDS = [
   'rating',
   'userRatingCount',
   'currentOpeningHours',
+  'utcOffsetMinutes',
   'websiteUri',
   'internationalPhoneNumber',
   'editorialSummary',
@@ -157,7 +199,6 @@ type GooglePlaceDetails = GooglePlace & {
   googleMapsUri?: string;
   websiteUri?: string;
   internationalPhoneNumber?: string;
-  currentOpeningHours?: { openNow?: boolean; weekdayDescriptions?: string[] };
   reviews?: {
     rating?: number;
     text?: { text: string };
@@ -252,6 +293,7 @@ export const nearbyPlaces = action({
               rating: place.rating,
               ratingCount: place.userRatingCount,
               summary: place.editorialSummary?.text,
+              hours: hoursOf(place),
             },
           ]
         : [],
@@ -286,7 +328,7 @@ export const placeDetails = action({
       googleMapsUrl: place.googleMapsUri,
       website: place.websiteUri,
       phone: place.internationalPhoneNumber,
-      openNow: place.currentOpeningHours?.openNow,
+      hours: hoursOf(place),
       openingHours: place.currentOpeningHours?.weekdayDescriptions,
       reviews: (place.reviews ?? []).slice(0, 3).flatMap((review) =>
         review.text?.text

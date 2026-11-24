@@ -32,7 +32,14 @@
       ],
       "./plugins/withNetskopeDebugTrust",
       "@clerk/expo",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Wanderlog shows how far places are from you.",
+          "motionUsagePermission": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

@@ -3,13 +3,18 @@ import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { DirectionsButton } from '@/features/places';
+import { distanceMeters, formatDistance } from '@/lib/geo';
+import { useMyLocation } from '@/lib/my-location';
 import { CheckIcon, PartyPopperIcon } from 'lucide-react-native';
 import { View } from 'react-native';
 import type { Stop } from '../use-itinerary';
 
-// Today's plan at a glance, for when you're out walking: the first stop not ticked off yet, with
-// big Directions and "Been there" buttons. "Been there" ticks it off and moves on to the next
-// one. Once every stop is done, a small celebration instead.
+// Further than this, the phone isn't in the trip's city (yet): no "away" line
+const NEAR_METERS = 50_000;
+
+// Today's plan at a glance, for when you're out walking: the first stop not ticked off yet and
+// how far away it is, with big Directions and "Been there" buttons. "Been there" ticks it off
+// and moves on to the next one. Once every stop is done, a small celebration instead.
 export function NextStopCard({
   stops,
   onDone,
@@ -18,6 +23,7 @@ export function NextStopCard({
   stops: Stop[];
   onDone: (stop: Stop) => void;
 }) {
+  const { coords } = useMyLocation();
   const index = stops.findIndex((stop) => !stop.done);
   const next = stops[index];
 
@@ -33,6 +39,7 @@ export function NextStopCard({
   }
 
   const { place } = next;
+  const away = coords ? distanceMeters(coords, place.coordinates) : null;
   return (
     <View className="gap-3 rounded-3xl bg-blue-50 p-4 dark:bg-blue-950/40">
       <Text className="text-xs font-semibold text-blue-700 uppercase dark:text-blue-300">
@@ -50,6 +57,11 @@ export function NextStopCard({
             {place.name}
           </Text>
           {place.category ? <Text variant="muted">{place.category}</Text> : null}
+          {away !== null && away < NEAR_METERS ? (
+            <Text className="text-sm font-semibold text-blue-700 dark:text-blue-300">
+              {formatDistance(away)} away
+            </Text>
+          ) : null}
         </View>
       </View>
       <View className="flex-row gap-2">

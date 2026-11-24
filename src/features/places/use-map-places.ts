@@ -1,3 +1,4 @@
+import { useNow } from '@/lib/use-now';
 import type { Doc } from '@convex/_generated/dataModel';
 import type { SuggestedPlace } from '@convex/googlePlaces';
 import { useState, type RefObject } from 'react';
@@ -5,8 +6,9 @@ import type MapView from 'react-native-maps';
 import type { Region } from 'react-native-maps';
 import type { Pin } from './components/pin-layer';
 import { areaToRegion, widerSearchArea } from './map-area';
+import { isOpen, openStatus } from './open-status';
+import { passesFilters, type FilterablePlace } from './place-filters';
 import { usePlaceMode } from './place-mode-context';
-import { matchesFilter } from './place-modes';
 import { useTripPlaces } from './trip-places';
 import { useExploreCity } from './use-explore-city';
 import { usePlaceActions } from './use-place-actions';
@@ -29,14 +31,21 @@ export function useMapPlaces(mapRef: RefObject<MapView | null>) {
   const explore = useExploreCity(trip?._id ?? null, area, mapRef);
   const { exploring } = explore;
   const shown = exploring ? explore.suggestions : suggestions;
-  const { filter } = usePlaceMode();
+  const { filter, openNow } = usePlaceMode();
+  const now = useNow();
   // The pin whose pop-up is open. Remembered by key (the Google place ID), so the pop-up stays
   // with the place while it's saved or removed, and closes by itself when the pin leaves the
   // map (or is filtered out).
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const allPins = toPins(saved ?? [], shown.data ?? []);
-  // The filter chip picked (Coffee, Parks…); places without a category only show under All
-  const pins = filter ? allPins.filter((pin) => matchesFilter(pin.category, filter)) : allPins;
+  // What the filters look at: the kind, and whether it's open (Google's hours come with the
+  // suggestions; a saved place outside the searched area has none)
+  const filterable = (pin: Pin): FilterablePlace => ({
+    category: pin.category,
+    isOpen: isOpen(openStatus(pin.suggestion?.hours, now)),
+  });
+  const filters = { filter, openNow };
+  const pins = allPins.filter((pin) => passesFilters(filterable(pin), filters));
   const shownArea = exploring?.area ?? area;
   const searchShownArea = exploring ? explore.searchArea : searchArea;
   const widerArea = shownArea ? widerSearchArea(shownArea) : null;
@@ -61,8 +70,9 @@ export function useMapPlaces(mapRef: RefObject<MapView | null>) {
     title: exploring ? `Exploring ${exploring.destination.name}` : (trip?.name ?? ''),
     initialRegion: area ? areaToRegion(area) : NO_TRIP_REGION,
     pins,
-    // Every pin's category before filtering, to count the filter chips
-    categories: allPins.map((pin) => pin.category),
+    // Every pin before filtering, to count the filter chips
+    filterPlaces: allPins.map(filterable),
+    filters,
     selectedKey,
     selected: pins.find((pin) => pin.key === selectedKey),
     select: setSelectedKey,
