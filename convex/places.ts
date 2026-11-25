@@ -1,8 +1,8 @@
 import { v } from 'convex/values';
 import { mutation, query } from './_generated/server';
 import { getCurrentUser, getTripRole, requireTripRole, requireUser } from './lib/permissions';
-import type { Doc } from './_generated/dataModel';
-import { coordinates, placeKind, type PlaceKind } from './schema';
+import { placeKindOf } from './lib/placeKind';
+import { coordinates, placeKind } from './schema';
 
 // The places saved to a trip, both lists, newest first: the saved pins on the map (each list
 // shows its own, by `kind`). An empty list (not an error) when the caller can't see the trip,
@@ -55,11 +55,6 @@ export const add = mutation({
     return await ctx.db.insert('places', { tripId, addedBy: user._id, kind, ...place });
   },
 });
-
-// Which list a saved place is on. Places saved before sweet spots existed have no kind.
-export function placeKindOf(place: Doc<'places'>): PlaceKind {
-  return place.kind ?? 'sight';
-}
 
 // Removes a place from its trip, and from the itinerary days it was planned on
 export const remove = mutation({

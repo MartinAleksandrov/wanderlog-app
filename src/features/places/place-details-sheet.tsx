@@ -18,20 +18,16 @@ import {
   ReviewList,
   Section,
 } from './components/place-details-parts';
+import type { PlaceDetailsParams } from './place-details-href';
 import { PLACE_MODES, placeKindOf, type PlaceMode } from './place-modes';
 import { usePlaceActions } from './use-place-actions';
-
-// Route params. The name and photo come from the tapped card, so the top of the sheet shows
-// at once while the rest loads. `kind` is the side it was opened from: the sheet sits outside
-// the tabs, so it can't see their switch.
-type PlaceParams = { placeId: string; name?: string; photoName?: string; kind?: string };
 
 // The pop-up that slides up when a place is tapped in the places tab or "Details" on the map
 // (a form sheet route, src/app/place/[placeId].tsx): photos, rating, opening hours, contact
 // details and reviews, plus saving it or getting directions. Scrolls when it's taller than the
 // sheet.
 export function PlaceDetailsSheet() {
-  const { placeId, name, photoName, kind } = useLocalSearchParams<PlaceParams>();
+  const { placeId, name, photoName, kind } = useLocalSearchParams<PlaceDetailsParams>();
   const mode = PLACE_MODES[kind === 'sweet' ? 'sweet' : 'sight'];
   const getPlaceDetails = useAction(api.googlePlaces.placeDetails);
   // Cached per place: opening the same place again doesn't call Google

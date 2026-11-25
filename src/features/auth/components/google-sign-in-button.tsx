@@ -7,7 +7,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
 import { AppState, Image, Platform, View } from 'react-native';
 
-import { errorMessage } from '../auth-errors';
+import { clerkErrorMessage } from '../auth-errors';
 import { SigningInScreen } from './signing-in-screen';
 
 // Google's logo, hosted by Clerk (the same image Clerk's own sign-in UI uses)
@@ -81,7 +81,8 @@ export function GoogleSignInButton() {
         setError('Google sign-in could not be completed. Please try again.');
       }
     } catch (caught) {
-      setError(errorMessage(caught instanceof Error ? caught : null));
+      // Anything thrown that isn't an Error still gets a message (null would show nothing at all)
+      setError(clerkErrorMessage(caught instanceof Error ? caught : { message: String(caught) }));
     }
     reset();
   }

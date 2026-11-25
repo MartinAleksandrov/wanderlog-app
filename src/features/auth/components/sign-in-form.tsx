@@ -9,7 +9,7 @@ import { Link } from 'expo-router';
 import { useRef, useState } from 'react';
 import { Pressable, type TextInputInstance, View } from 'react-native';
 
-import { errorMessage } from '../auth-errors';
+import { clerkErrorMessage } from '../auth-errors';
 import { EmailCodeForm } from './email-code-form';
 import { GoogleSignInButton } from './google-sign-in-button';
 
@@ -39,7 +39,7 @@ export function SignInForm() {
   async function sendCode() {
     const { error: sendError } = await signIn.mfa.sendEmailCode();
     if (sendError) {
-      setError(errorMessage(sendError));
+      setError(clerkErrorMessage(sendError));
       return;
     }
     setError(null);
@@ -54,7 +54,7 @@ export function SignInForm() {
       return;
     }
     const { error: finalizeError } = await signIn.finalize();
-    if (finalizeError) setError(errorMessage(finalizeError));
+    if (finalizeError) setError(clerkErrorMessage(finalizeError));
   }
 
   async function onSubmit() {
@@ -66,7 +66,7 @@ export function SignInForm() {
       password,
     });
     if (passwordError) {
-      setError(errorMessage(passwordError));
+      setError(clerkErrorMessage(passwordError));
       return;
     }
 
@@ -94,7 +94,7 @@ export function SignInForm() {
     setError(null);
     const { error: verifyError } = await signIn.mfa.verifyEmailCode({ code });
     if (verifyError) {
-      setError(errorMessage(verifyError));
+      setError(clerkErrorMessage(verifyError));
       return;
     }
     await finishSignIn();

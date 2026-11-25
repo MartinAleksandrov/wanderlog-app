@@ -15,6 +15,7 @@ import type * as itinerary from "../itinerary.js";
 import type * as lib_dates from "../lib/dates.js";
 import type * as lib_limits from "../lib/limits.js";
 import type * as lib_permissions from "../lib/permissions.js";
+import type * as lib_placeKind from "../lib/placeKind.js";
 import type * as places from "../places.js";
 import type * as trips from "../trips.js";
 import type * as users from "../users.js";
@@ -33,6 +34,7 @@ declare const fullApi: ApiFromModules<{
   "lib/dates": typeof lib_dates;
   "lib/limits": typeof lib_limits;
   "lib/permissions": typeof lib_permissions;
+  "lib/placeKind": typeof lib_placeKind;
   places: typeof places;
   trips: typeof trips;
   users: typeof users;

@@ -59,7 +59,7 @@ function DayChip({
       onPress={onPress}
       accessibilityRole="tab"
       accessibilityState={{ selected: isSelected }}
-      accessibilityLabel={`Day ${tripDay.day}, ${tripDay.label}, ${count} stops`}
+      accessibilityLabel={`Day ${tripDay.day}, ${tripDay.label}, ${count === 1 ? '1 stop' : `${count} stops`}`}
       className={cn(
         'min-w-20 items-center gap-0.5 rounded-2xl border px-3 py-2',
         isSelected ? 'border-foreground bg-foreground' : 'border-border bg-card active:bg-accent',

@@ -17,16 +17,17 @@ export function isFiltered({ filter, openNow }: PlaceFilters): boolean {
   return filter !== null || openNow;
 }
 
-// How many places each chip would show if tapped, keeping the other filter as it is: a kind chip
-// counts only open places while "Open now" is on, and "Open now" counts only the picked kind
+// The chips to show and how many places each would show if tapped, keeping the other filter as it
+// is: a kind chip counts only open places while "Open now" is on, and "Open now" counts only the
+// picked kind. Only kinds with places here get a chip, so a small town doesn't offer empty ones;
+// the picked kind keeps its chip even with none, so it can be switched off.
 export function chipCounts(mode: PlaceMode, places: FilterablePlace[], filters: PlaceFilters) {
   const count = (picked: PlaceFilters) =>
     places.filter((place) => passesFilters(place, picked)).length;
   return {
-    kinds: mode.filters.map((filter) => ({
-      filter,
-      count: count({ filter, openNow: filters.openNow }),
-    })),
+    kinds: mode.filters
+      .map((filter) => ({ filter, count: count({ filter, openNow: filters.openNow }) }))
+      .filter(({ filter, count }) => count > 0 || filter.id === filters.filter?.id),
     open: count({ filter: filters.filter, openNow: true }),
   };
 }

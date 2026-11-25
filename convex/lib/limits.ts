@@ -8,5 +8,8 @@ export const TRIP_NOTES_MAX_LENGTH = 2000;
 // Bookings: names, codes, addresses and the like; notes are longer
 export const BOOKING_TEXT_MAX_LENGTH = 200;
 export const BOOKING_NOTES_MAX_LENGTH = 2000;
+// A hotel's website comes from Google, tracking parameters and all, and the form can't edit it:
+// a short limit would make that stay impossible to save
+export const BOOKING_URL_MAX_LENGTH = 2000;
 // The highest price a booking can have, in cents: 1,000,000 in any currency
 export const BOOKING_PRICE_MAX_CENTS = 100_000_000;

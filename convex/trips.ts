@@ -5,7 +5,7 @@ import { tripDayCount } from './itinerary';
 import { isCalendarDate } from './lib/dates';
 import { TRIP_NAME_MAX_LENGTH, TRIP_NOTES_MAX_LENGTH } from './lib/limits';
 import { getCurrentUser, getTripRole, requireTripRole, requireUser } from './lib/permissions';
-import { placeKindOf } from './places';
+import { placeKindOf } from './lib/placeKind';
 import { coordinates } from './schema';
 
 // Every trip the caller is a member of, latest start date first, with their role and how many
@@ -113,7 +113,9 @@ export const create = mutation({
     requireValidDates(args.startDate, args.endDate);
 
     const city = args.destination.split(',')[0]?.trim() || args.destination;
-    const tripId = await ctx.db.insert('trips', { name: `Trip to ${city}`, ...args });
+    // Within the limit `update` checks, or a long city name would make the trip unsaveable
+    const name = `Trip to ${city}`.slice(0, TRIP_NAME_MAX_LENGTH).trim();
+    const tripId = await ctx.db.insert('trips', { name, ...args });
     await ctx.db.insert('tripMembers', { tripId, userId: user._id, role: 'owner' });
     await ctx.db.patch('users', user._id, { activeTripId: tripId });
     return tripId;

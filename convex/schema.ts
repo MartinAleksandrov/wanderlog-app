@@ -25,17 +25,17 @@ export type Coordinates = Infer<typeof coordinates>;
 export const placeKind = v.union(v.literal('sight'), v.literal('sweet'));
 export type PlaceKind = Infer<typeof placeKind>;
 
-// What a person may do in the whole app (separate from their role in any one trip).
-// Exported so functions check roles against the same list.
+// What a person may do in the whole app (separate from their role in any one trip). Functions
+// read the type from the table, e.g. Doc<'users'>['role'].
 //   admin: manage the app: review all data, delete users and their content
 //   user:  a regular signed-in person; sees only trips they are a member of
-export const appRole = v.union(v.literal('admin'), v.literal('user'));
+const appRole = v.union(v.literal('admin'), v.literal('user'));
 
-// What a member may do in a trip. Exported so functions check roles against the same list.
+// What a member may do in a trip (see convex/lib/permissions.ts, which ranks them)
 //   owner:  everything, including deleting the trip and managing members
 //   editor: add and change places and the itinerary
 //   viewer: read only
-export const tripRole = v.union(v.literal('owner'), v.literal('editor'), v.literal('viewer'));
+const tripRole = v.union(v.literal('owner'), v.literal('editor'), v.literal('viewer'));
 
 // Fields shared by both kinds of itinerary item
 const itineraryItemBase = {

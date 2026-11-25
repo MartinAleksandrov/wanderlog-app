@@ -11,7 +11,8 @@ const FALLBACK = 'Something went wrong. Please try again.';
 
 // Turns a Clerk error into text we can show the user: first the specific API error
 // ("Password is incorrect…"), then the error's own user-facing text, then a generic fallback.
-export function errorMessage(error: ClerkErrorLike): string | null {
+// For Clerk only; errors from our backend go through errorMessage in src/lib/error-message.ts.
+export function clerkErrorMessage(error: ClerkErrorLike): string | null {
   if (!error) return null;
 
   // In development, log the full error (Metro terminal / logcat) so the real cause is never hidden.

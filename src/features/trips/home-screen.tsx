@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { showError } from '@/lib/error-message';
+import { useToday } from '@/lib/use-today';
 import { useUser } from '@clerk/expo';
 import { api } from '@convex/_generated/api';
 import { useMutation, useQuery } from 'convex/react';
@@ -13,7 +14,6 @@ import { ActiveTripCard } from './components/active-trip-card';
 import { HomeBackgroundVideo } from './components/home-background-video';
 import { NoTripState } from './components/no-trip-state';
 import { TripRow } from './components/trip-row';
-import { todayIsoDate } from '@/lib/dates';
 import type { TripSummary } from './types';
 
 // The first tab: the trip you're planning now (big card), then your upcoming and previous
@@ -33,8 +33,8 @@ export function HomeScreen() {
     },
   );
   const removeTrip = useMutation(api.trips.remove);
+  const today = useToday();
 
-  const today = todayIsoDate();
   const current = trips?.find((trip) => trip._id === activeTrip?._id);
   const others = trips?.filter((trip) => trip._id !== current?._id) ?? [];
   // trips.list is latest-first; upcoming trips read better soonest-first

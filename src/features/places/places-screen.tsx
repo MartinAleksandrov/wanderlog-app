@@ -19,6 +19,7 @@ import { LocationPrompt } from './components/location-prompt';
 import { ModeSwitch } from './components/mode-switch';
 import { PlaceCard, type PlaceInfo } from './components/place-card';
 import { isOpen, openStatus, type OpenStatus } from './open-status';
+import { placeDetailsHref } from './place-details-href';
 import { passesFilters } from './place-filters';
 import { usePlaceMode } from './place-mode-context';
 import type { PlaceMode } from './place-modes';
@@ -59,15 +60,14 @@ export function PlacesScreen() {
   function openDetails(row: Row) {
     const placeId = row.suggestion?.providerPlaceId ?? row.saved?.providerPlaceId;
     if (placeId === undefined) return;
-    router.push({
-      pathname: '/place/[placeId]',
-      params: {
+    router.push(
+      placeDetailsHref({
         placeId,
         name: row.info.name,
-        photoName: row.info.photoName ?? '',
+        photoName: row.info.photoName,
         kind: mode.kind,
-      },
-    });
+      }),
+    );
   }
 
   if (trip === undefined) {

@@ -68,7 +68,7 @@ export function useNearbyPlaces(
 }
 
 // Everything the map and places tabs show for the active trip, for the side that's switched on
-// (sights or sweet spots, see place-modes.tsx):
+// (sights or sweet spots, see place-modes.ts):
 // - trip:        the active trip (undefined while loading, null when the user has none)
 // - saved:       that side's places saved to the trip, live from Convex
 // - suggestions: that side's places in the search area, from Google

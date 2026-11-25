@@ -19,7 +19,7 @@ type PlacePinProps = {
   // Google's place type: picks the icon when there's no photo
   category?: string;
   coordinates: Coordinates;
-  // Which side of the app it belongs to: picks the colours (see place-modes.tsx)
+  // Which side of the app it belongs to: picks the colours (see place-modes.ts)
   kind: PlaceKind;
   // Saved to the trip (solid, with a check or heart) or only suggested (white label)
   isSaved: boolean;

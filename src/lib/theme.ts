@@ -3,7 +3,7 @@ import { DarkTheme, DefaultTheme, type Theme } from 'expo-router/react-navigatio
 // The same palette as the CSS variables in global.css, as plain color strings.
 // React Navigation (headers, tab bar, screen backgrounds) can't read CSS variables,
 // so it gets its colors from here to match the rest of the UI.
-export const THEME = {
+const THEME = {
   light: {
     background: 'hsl(0 0% 100%)',
     foreground: 'hsl(0 0% 3.9%)',

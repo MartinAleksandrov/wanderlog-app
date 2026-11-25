@@ -31,8 +31,9 @@ http.route({
       // Google didn't answer in time; the app shows the place's icon instead
       return new Response('Photo service timed out', { status: 504 });
     }
-    if (!response.ok) return new Response('Photo unavailable', { status: 404 });
-    const { photoUri } = (await response.json()) as { photoUri: string };
+    // Google answered without a photo address: a redirect to "undefined" would break the image
+    const { photoUri } = response.ok ? ((await response.json()) as { photoUri?: string }) : {};
+    if (!photoUri) return new Response('Photo unavailable', { status: 404 });
 
     return new Response(null, {
       status: 302,
