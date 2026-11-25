@@ -111,7 +111,9 @@ export function PlacesScreen() {
             <View className="gap-3 pt-4">
               <ModeSwitch kind={mode.kind} onChange={setKind} />
               <ModeBanner mode={mode} destination={trip.destination} />
-              {location.access === 'ask' ? <LocationPrompt onPress={location.enable} /> : null}
+              {location.access === 'ask' ? (
+                <LocationPrompt onPress={() => void location.enable()} />
+              ) : null}
               <FilterChips
                 mode={mode}
                 places={[...savedRows, ...suggestedRows]}
