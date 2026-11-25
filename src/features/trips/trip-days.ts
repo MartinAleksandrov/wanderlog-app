@@ -1,4 +1,4 @@
-import { addDays, daysBetween, fromIsoDate } from './trip-dates';
+import { addDays, daysBetween, formatDate, fromIsoDate } from '@/lib/dates';
 
 // One day of a trip, for the day chips and headings
 export type TripDay = {
@@ -31,4 +31,14 @@ export function tripDays(startDate: string, endDate: string): TripDay[] {
 export function todayDayNumber(startDate: string, endDate: string, today: string): number | null {
   if (today < startDate || today > endDate) return null;
   return daysBetween(startDate, today) + 1;
+}
+
+// A short line about where the trip is in time: "Starts in 12 days", "Day 2 of 5", "Ended …"
+export function tripStatus(startDate: string, endDate: string, today: string): string {
+  if (today < startDate) {
+    const days = daysBetween(today, startDate);
+    return days === 1 ? 'Starts tomorrow' : `Starts in ${days} days`;
+  }
+  if (today > endDate) return `Ended ${formatDate(endDate)}`;
+  return `Happening now · day ${daysBetween(startDate, today) + 1} of ${daysBetween(startDate, endDate) + 1}`;
 }

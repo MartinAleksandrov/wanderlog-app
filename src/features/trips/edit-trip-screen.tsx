@@ -11,8 +11,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { CheckIcon } from 'lucide-react-native';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, View } from 'react-native';
-import { DateField } from './components/date-field';
-import { addDays, daysBetween, formatDate } from './trip-dates';
+import { DateField } from '@/components/date-field';
+import { addDays, daysBetween, formatDate } from '@/lib/dates';
 
 type Trip = NonNullable<FunctionReturnType<typeof api.trips.get>>;
 type Stop = FunctionReturnType<typeof api.itinerary.listForTrip>[number];

@@ -2,6 +2,7 @@ import { ConvexError, v } from 'convex/values';
 import type { Doc } from './_generated/dataModel';
 import { mutation, query, type QueryCtx } from './_generated/server';
 import { tripDayCount } from './itinerary';
+import { isCalendarDate } from './lib/dates';
 import { TRIP_NAME_MAX_LENGTH, TRIP_NOTES_MAX_LENGTH } from './lib/limits';
 import { getCurrentUser, getTripRole, requireTripRole, requireUser } from './lib/permissions';
 import { placeKindOf } from './places';
@@ -85,16 +86,6 @@ async function findActiveTrip(ctx: QueryCtx, user: Doc<'users'>) {
   if (newest === null) return null;
   const trip = await ctx.db.get('trips', newest.tripId);
   return trip === null ? null : { ...trip, role: newest.role };
-}
-
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-
-// 'YYYY-MM-DD' and a day that exists. Shape alone isn't enough: '2027-02-31' parses, but as
-// 3 March, and '2027-13-01' doesn't parse at all.
-function isCalendarDate(date: string): boolean {
-  if (!ISO_DATE.test(date)) return false;
-  const parsed = Date.parse(`${date}T00:00:00Z`);
-  return !Number.isNaN(parsed) && new Date(parsed).toISOString().startsWith(date);
 }
 
 // The app only sends valid dates; this guards against other callers of the public API
@@ -198,14 +189,14 @@ export const setActive = mutation({
 });
 
 // Deletes a trip and everything in it. Owners only. Convex has no cascading deletes, so the
-// trip's itinerary, places and memberships are deleted here first.
+// trip's itinerary, places, bookings and memberships are deleted here first.
 export const remove = mutation({
   args: { tripId: v.id('trips') },
   handler: async (ctx, { tripId }) => {
     const user = await requireUser(ctx);
     await requireTripRole(ctx, user._id, tripId, 'owner');
 
-    const [items, places, members] = await Promise.all([
+    const [items, places, bookings, members] = await Promise.all([
       ctx.db
         .query('itineraryItems')
         .withIndex('by_trip_and_day_and_order', (q) => q.eq('tripId', tripId))
@@ -215,6 +206,10 @@ export const remove = mutation({
         .withIndex('by_trip', (q) => q.eq('tripId', tripId))
         .collect(),
       ctx.db
+        .query('bookings')
+        .withIndex('by_trip_and_start', (q) => q.eq('tripId', tripId))
+        .collect(),
+      ctx.db
         .query('tripMembers')
         .withIndex('by_trip_and_user', (q) => q.eq('tripId', tripId))
         .collect(),
@@ -222,6 +217,7 @@ export const remove = mutation({
     await Promise.all([
       ...items.map((item) => ctx.db.delete('itineraryItems', item._id)),
       ...places.map((place) => ctx.db.delete('places', place._id)),
+      ...bookings.map((booking) => ctx.db.delete('bookings', booking._id)),
       ...members.map((member) => ctx.db.delete('tripMembers', member._id)),
     ]);
     await ctx.db.delete('trips', tripId);

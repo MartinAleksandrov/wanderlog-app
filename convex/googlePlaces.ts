@@ -253,6 +253,63 @@ export const destinationDetails = action({
   },
 });
 
+// A place to stay the user can pick for a booking: a hotel, or any address (a rented apartment)
+export type StaySuggestion = { placeId: string; name: string; address: string };
+
+// Nearby results first: Google's search radius limit, 50 km, covers a city and its airport
+const STAY_SEARCH_RADIUS_METERS = 50_000;
+
+// Hotels and addresses matching what the user has typed so far, the ones near the trip's
+// destination first. No place type filter: Google calls hotels "hotel", "hostel", "lodging" and
+// more, and a rented apartment is just an address.
+export const searchStays = action({
+  args: { query: v.string(), near: v.optional(coordinates) },
+  handler: async (ctx, { query, near }): Promise<StaySuggestion[]> => {
+    const data = await placesRequest<GoogleAutocompleteResponse>(ctx, 'places:autocomplete', {
+      body: {
+        input: query,
+        ...(near
+          ? { locationBias: { circle: { center: near, radius: STAY_SEARCH_RADIUS_METERS } } }
+          : {}),
+      },
+    });
+    return (data.suggestions ?? []).flatMap(({ placePrediction: p }) =>
+      p
+        ? [
+            {
+              placeId: p.placeId,
+              name: p.structuredFormat.mainText.text,
+              address: p.structuredFormat.secondaryText?.text ?? '',
+            },
+          ]
+        : [],
+    );
+  },
+});
+
+// A picked stay's full address, map position and contact details, saved with the booking.
+// Phone and website are the "Place Details Enterprise" tier (1,000 free calls a month); this runs
+// once per stay added, when the user picks it.
+export const stayDetails = action({
+  args: { placeId: v.string() },
+  handler: async (ctx, { placeId }) => {
+    const place = await placesRequest<GooglePlaceDetails>(
+      ctx,
+      `places/${encodeURIComponent(placeId)}`,
+      {
+        method: 'GET',
+        fieldMask: 'location,formattedAddress,internationalPhoneNumber,websiteUri',
+      },
+    );
+    return {
+      coordinates: place.location,
+      address: place.formattedAddress,
+      phone: place.internationalPhoneNumber,
+      website: place.websiteUri,
+    };
+  },
+});
+
 // Where to look for places: the rectangle the map shows (its centre, width and height)
 export const searchArea = v.object({
   center: coordinates,

@@ -13,7 +13,7 @@ import { ActiveTripCard } from './components/active-trip-card';
 import { HomeBackgroundVideo } from './components/home-background-video';
 import { NoTripState } from './components/no-trip-state';
 import { TripRow } from './components/trip-row';
-import { todayIsoDate } from './trip-dates';
+import { todayIsoDate } from '@/lib/dates';
 import type { TripSummary } from './types';
 
 // The first tab: the trip you're planning now (big card), then your upcoming and previous
@@ -42,17 +42,21 @@ export function HomeScreen() {
   const previous = others.filter((trip) => trip.endDate < today);
 
   function confirmDelete(trip: TripSummary) {
-    Alert.alert(`Delete ${trip.name}?`, "Its saved places are deleted too. This can't be undone.", [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: () =>
-          void removeTrip({ tripId: trip._id }).catch((error: unknown) =>
-            showError("Couldn't delete the trip", error),
-          ),
-      },
-    ]);
+    Alert.alert(
+      `Delete ${trip.name}?`,
+      "Its saved places, plan and bookings are deleted too. This can't be undone.",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () =>
+            void removeTrip({ tripId: trip._id }).catch((error: unknown) =>
+              showError("Couldn't delete the trip", error),
+            ),
+        },
+      ],
+    );
   }
 
   function selectTrip(trip: TripSummary) {

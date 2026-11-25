@@ -2,14 +2,9 @@ import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { placeKindOf } from '@/features/places';
-import {
-  formatDateRange,
-  NoTripState,
-  todayDayNumber,
-  todayIsoDate,
-  tripDays,
-  type TripDay,
-} from '@/features/trips';
+import { DayBookings } from '@/features/bookings';
+import { NoTripState, todayDayNumber, tripDays, type TripDay } from '@/features/trips';
+import { formatDateRange, todayIsoDate } from '@/lib/dates';
 import { openRouteDirections } from '@/lib/directions';
 import { formatDistance, formatMinutes, routeWalkEstimate } from '@/lib/geo';
 import { useRouter } from 'expo-router';
@@ -99,6 +94,7 @@ export function PlanScreen() {
               isEditing={isEditing}
               onToggleEditing={() => setIsEditing(!isEditing)}
             />
+            <DayBookings tripId={trip._id} date={tripDay.date} />
             {stops === undefined ? (
               <ActivityIndicator className="py-6" />
             ) : dayStops.length === 0 ? (

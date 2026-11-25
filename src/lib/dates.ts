@@ -1,6 +1,7 @@
-// Trip dates are calendar dates, 'YYYY-MM-DD' (see convex/schema.ts). These helpers convert
-// them to and from the phone's local calendar without going through UTC, so a date never moves
-// by a day because of the time zone.
+// Calendar dates, 'YYYY-MM-DD', as trips and bookings store them (see convex/schema.ts). These
+// helpers convert them to and from the phone's local calendar without going through UTC, so a
+// date never moves by a day because of the time zone. Shared by every feature, so they live
+// here rather than inside one of them.
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -50,12 +51,16 @@ export function formatDateRange(startDate: string, endDate: string): string {
   return `${start} – ${formatDate(endDate)}`;
 }
 
-// A short line about where the trip is in time: "Starts in 12 days", "Day 2 of 5", "Ended …"
-export function tripStatus(startDate: string, endDate: string, today: string): string {
-  if (today < startDate) {
-    const days = daysBetween(today, startDate);
-    return days === 1 ? 'Starts tomorrow' : `Starts in ${days} days`;
-  }
-  if (today > endDate) return `Ended ${formatDate(endDate)}`;
-  return `Happening now · day ${daysBetween(startDate, today) + 1} of ${daysBetween(startDate, endDate) + 1}`;
+// "Fri, 12 Jun", for a list's day headings (the year is the trip's, so it's left out)
+export function formatWeekdayDate(isoDate: string): string {
+  return fromIsoDate(isoDate).toLocaleDateString(undefined, {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  });
+}
+
+// A moment's local clock time, 'HH:mm' (24-hour, as bookings store times)
+export function toClockTime(date: Date): string {
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
