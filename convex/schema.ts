@@ -19,10 +19,11 @@ export const coordinates = v.object({
 });
 export type Coordinates = Infer<typeof coordinates>;
 
-// The app's two sides, each with its own suggestions and its own saved list per trip:
-//   sight = places to visit (museums, landmarks, parks…)
-//   sweet = sweet spots (bakeries, cafes, brunch, desserts)
-export const placeKind = v.union(v.literal('sight'), v.literal('sweet'));
+// The app's three sides, each with its own suggestions and its own saved list per trip:
+//   sight      = places to visit (museums, landmarks, parks…)
+//   sweet      = sweet spots (bakeries, cafes, brunch, desserts)
+//   restaurant = restaurants (sit-down meals, any cuisine)
+export const placeKind = v.union(v.literal('sight'), v.literal('sweet'), v.literal('restaurant'));
 export type PlaceKind = Infer<typeof placeKind>;
 
 // What a person may do in the whole app (separate from their role in any one trip). Functions

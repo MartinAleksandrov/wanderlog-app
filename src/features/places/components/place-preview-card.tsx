@@ -38,7 +38,7 @@ import { SAVED_POP } from './saved-pop';
 
 type PlacePreviewCardProps = {
   pin: Pin;
-  // Sights or sweet spots: the card's colours, words and saved mark
+  // Sights, sweet spots or restaurants: the card's colours, words and saved mark
   mode: PlaceMode;
   // Metres from the phone, when it's in the city (see use-distance.ts)
   distance?: number;
@@ -53,8 +53,8 @@ type PlacePreviewCardProps = {
 
 // The pop-up at the bottom of the map for the tapped pin: the place's photos (swipe for more),
 // rating, how far away it is (in the city), Google's short description, and the buttons:
-// - the main one: save a suggestion ("Add to trip" / "Save sweet spot"), remove a saved place,
-//   or "Plan a trip" while exploring another city
+// - the main one: save a suggestion ("Add to trip" / "Save sweet spot" / "Save restaurant"),
+//   remove a saved place, or "Plan a trip" while exploring another city
 // - Directions: the blue Google Maps arrow, opens turn-by-turn directions to the place
 // - Details: the full sheet with hours, contact details and reviews
 //

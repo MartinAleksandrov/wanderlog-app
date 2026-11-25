@@ -19,7 +19,7 @@ import {
   Section,
 } from './components/place-details-parts';
 import type { PlaceDetailsParams } from './place-details-href';
-import { PLACE_MODES, placeKindOf, type PlaceMode } from './place-modes';
+import { isPlaceKind, PLACE_MODES, placeKindOf, type PlaceMode } from './place-modes';
 import { usePlaceActions } from './use-place-actions';
 
 // The pop-up that slides up when a place is tapped in the places tab or "Details" on the map
@@ -28,7 +28,7 @@ import { usePlaceActions } from './use-place-actions';
 // sheet.
 export function PlaceDetailsSheet() {
   const { placeId, name, photoName, kind } = useLocalSearchParams<PlaceDetailsParams>();
-  const mode = PLACE_MODES[kind === 'sweet' ? 'sweet' : 'sight'];
+  const mode = PLACE_MODES[isPlaceKind(kind) ? kind : 'sight'];
   const getPlaceDetails = useAction(api.googlePlaces.placeDetails);
   // Cached per place: opening the same place again doesn't call Google
   const details = useCachedQuery({

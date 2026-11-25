@@ -6,10 +6,10 @@ import { isCalendarDate } from './lib/dates';
 import { TRIP_NAME_MAX_LENGTH, TRIP_NOTES_MAX_LENGTH } from './lib/limits';
 import { getCurrentUser, getTripRole, requireTripRole, requireUser } from './lib/permissions';
 import { placeKindOf } from './lib/placeKind';
-import { coordinates } from './schema';
+import { coordinates, type PlaceKind } from './schema';
 
 // Every trip the caller is a member of, latest start date first, with their role and how many
-// places to visit and sweet spots are saved (shown on the home screen).
+// places to visit, sweet spots and restaurants are saved (shown on the home screen).
 export const list = query({
   args: {},
   handler: async (ctx) => {
@@ -28,12 +28,14 @@ export const list = query({
           .query('places')
           .withIndex('by_trip', (q) => q.eq('tripId', trip._id))
           .collect();
-        const sweetCount = places.filter((place) => placeKindOf(place) === 'sweet').length;
+        const countOf = (kind: PlaceKind) =>
+          places.filter((place) => placeKindOf(place) === kind).length;
         return {
           ...trip,
           role: membership.role,
-          placeCount: places.length - sweetCount,
-          sweetCount,
+          placeCount: countOf('sight'),
+          sweetCount: countOf('sweet'),
+          restaurantCount: countOf('restaurant'),
         };
       }),
     );

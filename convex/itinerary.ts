@@ -3,8 +3,9 @@ import type { Doc, Id } from './_generated/dataModel';
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
 import { getCurrentUser, getTripRole, requireTripRole, requireUser } from './lib/permissions';
 
-// The day-by-day plan: saved places (sights and sweet spots) put on the trip's days, in order.
-// Days are numbers (1 = the first day), so changing the trip's dates moves the plan with them.
+// The day-by-day plan: saved places (sights, sweet spots, restaurants) put on the trip's days,
+// in order. Days are numbers (1 = the first day), so changing the trip's dates moves the plan
+// with them.
 // Viewers can read the plan; editors and owners change it.
 
 const DAY_MS = 24 * 60 * 60 * 1000;

@@ -5,6 +5,6 @@ export { savedPlaceDetailsHref } from './place-details-href';
 export { PlaceDetailsSheet } from './place-details-sheet';
 export { PlacesScreen } from './places-screen';
 export { DirectionsButton } from './components/directions-button';
-export { PlaceModeProvider, PlacesTabIcon } from './place-mode-context';
-export { PLACE_MODES, placeKindOf, type PlaceMode } from './place-modes';
+export { PlaceModeProvider, usePlaceMode } from './place-mode-context';
+export { PLACE_KINDS, PLACE_MODES, placeKindOf, type PlaceMode } from './place-modes';
 export { SearchAreaProvider } from './trip-places';

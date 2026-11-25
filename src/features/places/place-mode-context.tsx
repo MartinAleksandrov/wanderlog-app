@@ -1,8 +1,7 @@
 import type { PlaceKind } from '@convex/schema';
 import * as SecureStore from 'expo-secure-store';
 import { createContext, use, useEffect, useState, type ReactNode } from 'react';
-import type { ColorValue } from 'react-native';
-import { PLACE_MODES } from './place-modes';
+import { isPlaceKind, PLACE_MODES } from './place-modes';
 
 // Where the side picked last time is kept on the phone. SecureStore is already in the app (Clerk
 // keeps its session there); a one-word setting fits fine.
@@ -22,18 +21,18 @@ const PlaceModeContext = createContext<{
 // Which side the map and places tabs show, each side's filter chip, and the "Open now" filter.
 // Lives in the tabs layout, above both tabs, so the switch and chips on one tab change the other
 // too. The side is remembered between app launches; the chips start on "All" and "Open now" off.
-// "Open now" is one switch for both sides: looking for what's open goes for cafés and museums
-// alike.
+// "Open now" is one switch for all sides: looking for what's open goes for cafés, restaurants
+// and museums alike.
 export function PlaceModeProvider({ children }: { children: ReactNode }) {
   const [kind, setKindState] = useState<PlaceKind>('sight');
-  const [filters, setFilters] = useState<Filters>({ sight: null, sweet: null });
+  const [filters, setFilters] = useState<Filters>({ sight: null, sweet: null, restaurant: null });
   const [openNow, setOpenNow] = useState(false);
 
   // The side picked last time. Reading takes a moment, so sights show first.
   useEffect(() => {
     SecureStore.getItemAsync(STORAGE_KEY)
       .then((saved) => {
-        if (saved === 'sight' || saved === 'sweet') setKindState(saved);
+        if (isPlaceKind(saved)) setKindState(saved);
       })
       // Not remembered: start on sights, as on a first launch
       .catch(() => undefined);
@@ -68,11 +67,4 @@ export function usePlaceMode() {
     openNow,
     setOpenNow,
   };
-}
-
-// The places tab's icon follows the switch: a landmark for sights, a croissant for sweet spots
-export function PlacesTabIcon({ color, size }: { color: ColorValue; size: number }) {
-  const { mode } = usePlaceMode();
-  const ModeIcon = mode.icon;
-  return <ModeIcon color={color} size={size} />;
 }

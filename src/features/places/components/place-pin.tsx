@@ -33,8 +33,8 @@ type PlacePinProps = {
 // A map pin: a rounded label with the place's photo (or an icon for its kind of place) and its
 // name when there's room, on a pointed tail whose tip marks the spot. Where pins are crowded it's
 // just a small dot on the spot. The selected pin gets a soft ring in its colour. Saved places
-// carry a check (sights) or a heart (sweet spots), so they stand out from suggestions even for
-// someone who can't tell the colours apart.
+// carry a check (sights), a heart (sweet spots) or a bookmark (restaurants), so they stand out
+// from suggestions even for someone who can't tell the colours apart.
 //
 // Android draws custom pins into a picture. While tracksViewChanges is on it redraws them all
 // the time, which makes the map slow, so it's switched off once the pin looks final: the photo
