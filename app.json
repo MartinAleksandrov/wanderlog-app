@@ -44,11 +44,25 @@
           "locationWhenInUsePermission": "Wandr shows how far places are from you.",
           "motionUsagePermission": false
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "extraProguardRules": "# react-native-maps pulls in WorkManager, which ships Room 2.5. Room creates its generated databases by reflection, and R8 full mode strips their constructors under Room 2.5's own keep rule, so release builds crash on launch.\n-keep class * extends androidx.room.RoomDatabase { <init>(); }"
+          }
+        }
       ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "0f681565-658c-4ba7-a038-4ba851449653"
+      }
+    },
+    "owner": "martsexpo"
   }
 }
