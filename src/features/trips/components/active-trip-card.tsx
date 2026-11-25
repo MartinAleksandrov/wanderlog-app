@@ -2,17 +2,19 @@ import { PlacePhoto } from '@/components/place-photo';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
+import { NextBookingRow } from '@/features/bookings';
 import { useRouter } from 'expo-router';
 import { LandmarkIcon, MapIcon, MapPinIcon, PencilIcon, Trash2Icon } from 'lucide-react-native';
 import { View } from 'react-native';
 import { savedCounts } from '../saved-counts';
-import { formatDateRange, tripStatus } from '../trip-dates';
+import { formatDateRange } from '@/lib/dates';
+import { tripStatus } from '../trip-days';
 import type { TripSummary } from '../types';
 
 type ActiveTripCardProps = { trip: TripSummary; today: string; onDelete: () => void };
 
 // The home screen's big card for the trip the map and places tabs show: cover photo, dates,
-// how far away it is, saved places, and shortcuts to the other tabs.
+// how far away it is, saved places, the next booking, and shortcuts to the other tabs.
 export function ActiveTripCard({ trip, today, onDelete }: ActiveTripCardProps) {
   const router = useRouter();
 
@@ -65,6 +67,7 @@ export function ActiveTripCard({ trip, today, onDelete }: ActiveTripCardProps) {
             {trip.notes}
           </Text>
         ) : null}
+        <NextBookingRow tripId={trip._id} canEdit={trip.role !== 'viewer'} />
         <View className="flex-row gap-2">
           <Button className="flex-1" onPress={() => router.navigate('/map')}>
             <Icon as={MapIcon} />

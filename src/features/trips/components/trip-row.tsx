@@ -2,7 +2,7 @@ import { PlacePhoto } from '@/components/place-photo';
 import { Text } from '@/components/ui/text';
 import { Pressable, View } from 'react-native';
 import { savedCounts } from '../saved-counts';
-import { formatDateRange } from '../trip-dates';
+import { formatDateRange } from '@/lib/dates';
 import type { TripSummary } from '../types';
 
 // One trip in the home screen's "Upcoming" and "Previous" lists. Tapping it makes it the

@@ -3,7 +3,7 @@ import { Text } from '@/components/ui/text';
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { CalendarDaysIcon } from 'lucide-react-native';
 import { Platform, Pressable, View } from 'react-native';
-import { formatDate, fromIsoDate, toIsoDate } from '../trip-dates';
+import { formatDate, fromIsoDate, toIsoDate } from '@/lib/dates';
 
 type DateFieldProps = {
   label: string;

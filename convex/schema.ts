@@ -5,7 +5,8 @@ import { v, type Infer } from 'convex/values';
 //
 //   users ──< tripMembers >── trips ──< places
 //                               │         ▲ (place items point to a place)
-//                               └──< itineraryItems
+//                               ├──< itineraryItems
+//                               └──< bookings (hotels, flights, transport, activities)
 //
 // "A ──< B" means one A has many Bs, and each B stores its A's ID (v.id('a')).
 // Convex adds _id and _creationTime to every document automatically.
@@ -46,6 +47,100 @@ const itineraryItemBase = {
   // (between 1 and 2 -> 1.5) without renumbering the rest.
   order: v.number(),
 };
+
+// A booking's price. Whole cents (12550 = 125.50), not a decimal: decimals drift in JavaScript
+// (0.1 + 0.2 is 0.30000000000000004), and sums of prices have to be exact. The currency is an
+// ISO 4217 code such as 'EUR'.
+export const money = v.object({ amountCents: v.number(), currency: v.string() });
+export type Money = Infer<typeof money>;
+
+// How a transport booking travels. 'car' is a rental car: picked up at the start, returned at
+// the end.
+export const transportMode = v.union(
+  v.literal('train'),
+  v.literal('bus'),
+  v.literal('ferry'),
+  v.literal('car'),
+  v.literal('other'),
+);
+export type TransportMode = Infer<typeof transportMode>;
+
+// Fields every booking has. Dates and times are local, as printed on the ticket or the booking
+// confirmation, with no time zone: a flight leaves on the origin's clock and lands on the
+// destination's. Dates (not trip day numbers like the plan): a booking is for a real day, and
+// stays on it when the trip's dates change.
+const bookingBase = {
+  // 'YYYY-MM-DD'. Check-in, departure, pick-up, or when an activity starts.
+  startDate: v.string(),
+  // 'HH:mm', optional: a check-in time isn't always known
+  startTime: v.optional(v.string()),
+  endTime: v.optional(v.string()),
+  // The booking reference to show at the desk or the gate
+  confirmationCode: v.optional(v.string()),
+  price: v.optional(money),
+  notes: v.optional(v.string()),
+};
+
+// What each type of booking has on top of the base. `type` tells them apart, so TypeScript knows
+// which fields a booking has once its type is checked.
+const stayFields = {
+  type: v.literal('stay'),
+  // The hotel or apartment
+  name: v.string(),
+  address: v.optional(v.string()),
+  // Filled in when it was picked from Google's search; missing when typed by hand
+  coordinates: v.optional(coordinates),
+  providerPlaceId: v.optional(v.string()),
+  phone: v.optional(v.string()),
+  website: v.optional(v.string()),
+  // Check-out. Required: a stay always ends.
+  endDate: v.string(),
+};
+const flightFields = {
+  type: v.literal('flight'),
+  // As on the boarding pass, e.g. 'LH 1234'
+  flightNumber: v.string(),
+  airline: v.optional(v.string()),
+  // Airports or cities, e.g. 'SOF' or 'Sofia'
+  from: v.string(),
+  to: v.string(),
+  // Arrival
+  endDate: v.optional(v.string()),
+  terminal: v.optional(v.string()),
+  seat: v.optional(v.string()),
+};
+const transportFields = {
+  type: v.literal('transport'),
+  mode: transportMode,
+  // The company or the train/bus number, e.g. 'Eurostar 9014' or 'Avis'
+  name: v.string(),
+  // Stations, or a rental car's pick-up and drop-off
+  from: v.optional(v.string()),
+  to: v.optional(v.string()),
+  // Arrival, or when a rental car goes back
+  endDate: v.optional(v.string()),
+};
+const activityFields = {
+  type: v.literal('activity'),
+  // Tickets, a tour, a restaurant table: 'Sagrada Família tickets'
+  name: v.string(),
+  address: v.optional(v.string()),
+  endDate: v.optional(v.string()),
+};
+
+// A booking as the app sends it to bookings.create and bookings.update: everything except which
+// trip it's in and who added it, which the backend sets itself.
+export const bookingInput = v.union(
+  v.object({ ...bookingBase, ...stayFields }),
+  v.object({ ...bookingBase, ...flightFields }),
+  v.object({ ...bookingBase, ...transportFields }),
+  v.object({ ...bookingBase, ...activityFields }),
+);
+export type BookingInput = Infer<typeof bookingInput>;
+export type BookingType = BookingInput['type'];
+
+// The stored booking: the same, plus its trip and who added it
+const bookingOwner = { tripId: v.id('trips'), addedBy: v.id('users') };
 
 export default defineSchema({
   // One row per person who has signed in. Clerk owns the account itself (password, email
@@ -136,4 +231,17 @@ export default defineSchema({
     .index('by_trip_and_day_and_order', ['tripId', 'day', 'order'])
     // A place's itinerary entries, to remove them when the place is deleted
     .index('by_place', ['placeId']),
+
+  // Reservations made for a trip: where you sleep, how you get there and around, and tickets.
+  // Each row is one of four types (see bookingInput above).
+  bookings: defineTable(
+    v.union(
+      v.object({ ...bookingOwner, ...bookingBase, ...stayFields }),
+      v.object({ ...bookingOwner, ...bookingBase, ...flightFields }),
+      v.object({ ...bookingOwner, ...bookingBase, ...transportFields }),
+      v.object({ ...bookingOwner, ...bookingBase, ...activityFields }),
+    ),
+  )
+    // A trip's bookings in time order. A missing start time sorts first in its day.
+    .index('by_trip_and_start', ['tripId', 'startDate', 'startTime']),
 });

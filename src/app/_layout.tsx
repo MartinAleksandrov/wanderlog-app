@@ -143,6 +143,16 @@ function RootNavigator() {
             name="edit-trip/[tripId]"
             options={{ presentation: 'modal', headerShown: true, title: 'Edit trip' }}
           />
+          {/* A full screen with a back arrow: the bookings are read, not just glanced at */}
+          <Stack.Screen
+            name="trip/[tripId]/bookings"
+            options={{ headerShown: true, title: 'Bookings' }}
+          />
+          {/* The form sets its own title ("Add a stay", "Edit flight") */}
+          <Stack.Screen
+            name="trip/[tripId]/booking"
+            options={{ presentation: 'modal', headerShown: true, title: 'Booking' }}
+          />
           {/* Slides up from the bottom: 60% of the screen first, drag up for the full height.
             Sheets have no header; the screen draws its own title. */}
           <Stack.Screen

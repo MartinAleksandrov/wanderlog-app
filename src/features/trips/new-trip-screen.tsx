@@ -10,9 +10,9 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MapPinIcon, PlaneTakeoffIcon } from 'lucide-react-native';
 import { useState } from 'react';
 import { ActivityIndicator, ScrollView, View } from 'react-native';
-import { DateField } from './components/date-field';
+import { DateField } from '@/components/date-field';
 import { DestinationResults } from './components/destination-results';
-import { addDays, daysBetween, todayIsoDate } from './trip-dates';
+import { addDays, daysBetween, todayIsoDate } from '@/lib/dates';
 
 // Optional route params: a city picked elsewhere (the map's search bar), so the pop-up opens
 // with it already chosen. All three come together.

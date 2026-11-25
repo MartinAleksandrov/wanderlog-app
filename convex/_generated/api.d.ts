@@ -8,9 +8,11 @@
  * @module
  */
 
+import type * as bookings from "../bookings.js";
 import type * as googlePlaces from "../googlePlaces.js";
 import type * as http from "../http.js";
 import type * as itinerary from "../itinerary.js";
+import type * as lib_dates from "../lib/dates.js";
 import type * as lib_limits from "../lib/limits.js";
 import type * as lib_permissions from "../lib/permissions.js";
 import type * as places from "../places.js";
@@ -24,9 +26,11 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  bookings: typeof bookings;
   googlePlaces: typeof googlePlaces;
   http: typeof http;
   itinerary: typeof itinerary;
+  "lib/dates": typeof lib_dates;
   "lib/limits": typeof lib_limits;
   "lib/permissions": typeof lib_permissions;
   places: typeof places;
