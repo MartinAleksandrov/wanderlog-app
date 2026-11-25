@@ -20,9 +20,9 @@ import { WalkLeg } from './components/walk-leg';
 import { useItinerary, useItineraryActions, type Stop } from './use-itinerary';
 
 // The plan tab: the trip day by day. Pick a day at the top, then see its stops in order (saved
-// sights and sweet spots), with a rough walk between each two. On the trip's current day, the
-// next stop not done yet sits on top with Directions and Done. Under the stops: add more saved
-// places, show the day as a route on the map, or walk it in Google Maps.
+// sights, sweet spots and restaurants), with a rough walk between each two. On the trip's
+// current day, the next stop not done yet sits on top with Directions and Done. Under the stops:
+// add more saved places, show the day as a route on the map, or walk it in Google Maps.
 export function PlanScreen() {
   const router = useRouter();
   const { trip, stops } = useItinerary();
@@ -38,7 +38,7 @@ export function PlanScreen() {
   if (trip === null) {
     return (
       <View className="flex-1 justify-center bg-background p-6">
-        <NoTripState message="Pick a city, save places to visit and sweet spots, then plan your days here." />
+        <NoTripState message="Pick a city, save places to visit, sweet spots and restaurants, then plan your days here." />
       </View>
     );
   }
@@ -204,7 +204,7 @@ function EmptyDay({ day }: { day: number }) {
     <View className="items-center gap-1 rounded-2xl border border-dashed border-border p-6">
       <Text className="font-semibold">Nothing planned for day {day} yet</Text>
       <Text variant="muted" className="text-center">
-        Add places you saved (sights and sweet spots), then walk them in order.
+        Add places you saved (sights, sweet spots, restaurants), then walk them in order.
       </Text>
     </View>
   );

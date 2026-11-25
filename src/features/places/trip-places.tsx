@@ -26,9 +26,9 @@ export function SearchAreaProvider({ children }: { children: ReactNode }) {
   return <SearchAreaContext value={{ area, setArea }}>{children}</SearchAreaContext>;
 }
 
-// Places of one kind (sights or sweet spots) around an area, from Google through our backend.
-// `scope` keeps separate lists apart (a trip's ID, or 'explore' for a city found with the map's
-// search bar).
+// Places of one kind (sights, sweet spots or restaurants) around an area, from Google through
+// our backend. `scope` keeps separate lists apart (a trip's ID, or 'explore' for a city found
+// with the map's search bar).
 //
 // TanStack Query caches the answer per area and kind: screens showing the same area share one
 // request, and going back to an earlier area, or switching sides back and forth, doesn't pay
@@ -68,7 +68,7 @@ export function useNearbyPlaces(
 }
 
 // Everything the map and places tabs show for the active trip, for the side that's switched on
-// (sights or sweet spots, see place-modes.ts):
+// (sights, sweet spots or restaurants, see place-modes.ts):
 // - trip:        the active trip (undefined while loading, null when the user has none)
 // - saved:       that side's places saved to the trip, live from Convex
 // - suggestions: that side's places in the search area, from Google

@@ -27,7 +27,7 @@ type PinLayerProps = {
   // The pin whose pop-up is open, if any
   selectedKey: string | null;
   onSelect: (key: string) => void;
-  // Sights or sweet spots: the pins' colours
+  // Sights, sweet spots or restaurants: the pins' colours
   kind: PlaceKind;
 };
 

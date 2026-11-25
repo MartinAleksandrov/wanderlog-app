@@ -109,15 +109,56 @@ const PLACE_TYPES: Record<PlaceKind, string[]> = {
     'chocolate_shop',
     'confectionery',
   ],
+  // Restaurants: a meal of any cuisine. Fast food (fast_food_restaurant, where Google files the
+  // big chains) is left out, but burger restaurants stay: the rating rule keeps the good ones.
+  // Breakfast and brunch places are sweet spots.
+  restaurant: [
+    'restaurant',
+    'american_restaurant',
+    'asian_restaurant',
+    'barbecue_restaurant',
+    'brazilian_restaurant',
+    'chinese_restaurant',
+    'fine_dining_restaurant',
+    'french_restaurant',
+    'greek_restaurant',
+    'hamburger_restaurant',
+    'indian_restaurant',
+    'indonesian_restaurant',
+    'italian_restaurant',
+    'japanese_restaurant',
+    'korean_restaurant',
+    'lebanese_restaurant',
+    'mediterranean_restaurant',
+    'mexican_restaurant',
+    'middle_eastern_restaurant',
+    'pizza_restaurant',
+    'ramen_restaurant',
+    'seafood_restaurant',
+    'spanish_restaurant',
+    'steak_house',
+    'sushi_restaurant',
+    'thai_restaurant',
+    'turkish_restaurant',
+    'vegan_restaurant',
+    'vegetarian_restaurant',
+    'vietnamese_restaurant',
+  ],
 };
 
-// Sweet spots must be loved by many: rated above 4.0 by more than 50 people. A lone 5-star
-// review says little, and there are plenty of cafes to choose from.
-const SWEET_MIN_RATING = 4.0;
-const SWEET_MIN_REVIEWS = 50;
+// Sweet spots and restaurants must be loved by many: a lone 5-star review says little, and
+// there are plenty of cafes and restaurants to choose from. Sights have no rule: a famous
+// landmark is worth seeing whatever its rating.
+//   sweet spots: rated above 4.0 by more than 50 people
+//   restaurants: rated 4.1 or more by at least 50 people
+const RATING_RULES: Partial<Record<PlaceKind, (rating: number, count: number) => boolean>> = {
+  sweet: (rating, count) => rating > 4.0 && count > 50,
+  restaurant: (rating, count) => rating >= 4.1 && count >= 50,
+};
 
-function isWellRated(place: SuggestedPlace): boolean {
-  return (place.rating ?? 0) > SWEET_MIN_RATING && (place.ratingCount ?? 0) > SWEET_MIN_REVIEWS;
+function isWellRated(place: SuggestedPlace, kind: PlaceKind): boolean {
+  const rule = RATING_RULES[kind];
+  return rule === undefined || rule(place.rating ?? 0, place.ratingCount ?? 0);
 }
 
 // Google bills a request at the price tier of its most expensive field. rating, userRatingCount
@@ -328,22 +369,23 @@ const MAX_RADIUS_METERS = 50_000;
 // The most popular places of one kind on the map's rectangle, at most 30, most reviewed first.
 //
 // One search (20 places, in a circle) leaves the map half empty: much of the circle is off the
-// screen, and the sweet spots' rating rule drops more. So the rectangle is split into four
-// quarters, each searched on its own (four calls at once), and only places inside the rectangle
-// are kept. Taking each quarter's best in turn spreads the pins over the whole map instead of
-// only the busy centre.
+// screen, and the rating rules (sweet spots, restaurants) drop more. So the rectangle is split
+// into four quarters, each searched on its own (four calls at once), and only places inside the
+// rectangle are kept. Taking each quarter's best in turn spreads the pins over the whole map
+// instead of only the busy centre.
 //
 // Sights match any of a place's types (a park that's also a tourist attraction counts). Sweet
-// spots must be one of those types first and foremost (its primary type): supermarkets and
-// petrol stations also carry "bakery" or "cafe" among their types.
+// spots and restaurants must be one of those types first and foremost (its primary type):
+// supermarkets and petrol stations also carry "bakery" or "cafe" among their types, and hotels
+// "restaurant".
 export const nearbyPlaces = action({
   args: { area: searchArea, kind: placeKind },
   handler: async (ctx, { area: requested, kind }): Promise<SuggestedPlace[]> => {
     const area = searchableArea(requested);
     const types =
-      kind === 'sweet'
-        ? { includedPrimaryTypes: PLACE_TYPES.sweet }
-        : { includedTypes: PLACE_TYPES.sight };
+      kind === 'sight'
+        ? { includedTypes: PLACE_TYPES.sight }
+        : { includedPrimaryTypes: PLACE_TYPES[kind] };
     const answers = await Promise.allSettled(
       quarterCircles(area).map((circle) =>
         placesRequest<{ places?: GooglePlace[] }>(ctx, 'places:searchNearby', {
@@ -369,7 +411,7 @@ export const nearbyPlaces = action({
       (data.places ?? [])
         .flatMap(toSuggestedPlace)
         .filter((place) => isInside(area, place.coordinates))
-        .filter((place) => kind !== 'sweet' || isWellRated(place)),
+        .filter((place) => isWellRated(place, kind)),
     );
     // A popular place near the middle is found by several quarters: keep it once, in its first
     // spot (a Map keeps the order things were added in)

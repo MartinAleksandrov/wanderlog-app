@@ -12,8 +12,9 @@ import type { RouteStop } from '../use-day-route';
 const ROUTE_BLUE = '#2563eb';
 
 // A day's stops on the map: numbered circles in the plan's order (purple for sights, chocolate
-// for sweet spots, green with a check once done), joined by a dashed line. The line is straight
-// from stop to stop, as the crow flies: it shows the order, and Google Maps gives the streets.
+// for sweet spots, teal for restaurants, green with a check once done), joined by a dashed line.
+// The line is straight from stop to stop, as the crow flies: it shows the order, and Google Maps
+// gives the streets.
 //
 // The parent gives this layer a new key whenever the stops change, so all its markers are added
 // again at the end of the map's children (see useAppendOnlyOrder in pin-layer.tsx for why).

@@ -14,7 +14,7 @@ type MapStatusProps = {
   // The area the orange pins were searched in, and what the map shows now
   searchedArea: SearchArea;
   region: Region | null;
-  // "20 places" / "14 sweet spots"
+  // "20 places" / "14 sweet spots" / "30 restaurants"
   countLabel: string;
   isLoading: boolean;
   error: Error | null;

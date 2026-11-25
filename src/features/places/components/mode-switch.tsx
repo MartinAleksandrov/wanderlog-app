@@ -3,13 +3,12 @@ import { Text } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
 import type { PlaceKind } from '@convex/schema';
 import { Pressable, View } from 'react-native';
-import { PLACE_MODES } from '../place-modes';
+import { PLACE_KINDS, PLACE_MODES } from '../place-modes';
 
-const KINDS: PlaceKind[] = ['sight', 'sweet'];
-
-// The "Sights | Sweet spots" switch at the top of the map and places tabs. The selected side
-// is filled with its own colour (orange or pink), so the whole screen's theme is announced
-// right where you flip it.
+// The "Sights | Sweet spots | Restaurants" switch at the top of the map and places tabs. The
+// selected side is filled with its own colour (orange, pink or red) and named, so the whole
+// screen's theme is announced right where you flip it. The other sides show only their icon:
+// three names side by side, plus the map's filter button, don't fit on a phone.
 export function ModeSwitch({
   kind,
   onChange,
@@ -24,32 +23,28 @@ export function ModeSwitch({
       accessibilityRole="tablist"
       className={cn('flex-row self-center rounded-full bg-background p-1 shadow-md', className)}
     >
-      {KINDS.map((option) => {
+      {PLACE_KINDS.map((option) => {
         const mode = PLACE_MODES[option];
         const isSelected = option === kind;
         return (
           <Pressable
             key={option}
             accessibilityRole="tab"
+            accessibilityLabel={mode.label}
             accessibilityState={{ selected: isSelected }}
             onPress={() => onChange(option)}
             className={cn(
-              'flex-row items-center gap-1.5 rounded-full px-4 py-2',
-              isSelected ? mode.switchActive : 'active:bg-accent',
+              'flex-row items-center gap-1.5 rounded-full py-2',
+              isSelected ? cn('px-4', mode.switchActive) : 'px-3 active:bg-accent',
             )}
           >
             <Icon
               as={mode.icon}
               className={cn('size-4', isSelected ? 'text-white' : 'text-muted-foreground')}
             />
-            <Text
-              className={cn(
-                'text-sm font-semibold',
-                isSelected ? 'text-white' : 'text-muted-foreground',
-              )}
-            >
-              {mode.label}
-            </Text>
+            {isSelected ? (
+              <Text className="text-sm font-semibold text-white">{mode.label}</Text>
+            ) : null}
           </Pressable>
         );
       })}

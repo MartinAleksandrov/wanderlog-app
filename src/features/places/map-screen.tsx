@@ -28,10 +28,11 @@ import { useMapRoute } from './use-map-route';
 import { useRevealPin } from './use-reveal-pin';
 
 // The second tab: a Google map with places as photo pins, for the side switched on under the
-// search bar: sights (orange suggestions, purple trip places, Google's normal map) or sweet
-// spots (pink suggestions, chocolate saved spots, a cream map; see place-modes.ts). The filter
-// button next to the switch narrows the pins to one kind (Coffee, Parks…) and/or the places open
-// now, from a panel that drops down only when wanted, so the map keeps its room. Pins shrink to
+// search bar: sights (orange suggestions, purple trip places, Google's normal map), sweet spots
+// (pink suggestions, chocolate saved spots, a cream map) or restaurants (red suggestions, teal
+// saved restaurants, a grey map; see place-modes.ts). The filter button next to the switch
+// narrows the pins to one kind (Coffee, Parks…) and/or the places open now, from a panel that
+// drops down only when wanted, so the map keeps its room. Pins shrink to
 // dots where they'd cover each other and grow back as you zoom in (pin-layout.ts). Tapping a pin
 // opens its pop-up at the bottom, sliding the map up first if the pop-up would cover the pin;
 // tapping the map closes it. The search bar finds any city: the map flies there, shows its
@@ -254,8 +255,8 @@ function PlacesOverlay({
   );
 }
 
-// "[Sights | Sweet spots] (⚙)": the side switch with the filter button beside it, and the filter
-// panel under them while it's open
+// "[Sights | Sweet spots | Restaurants] (⚙)": the side switch with the filter button beside it,
+// and the filter panel under them while it's open
 function SideAndFilters({
   places,
   isFilterOpen,
@@ -275,7 +276,7 @@ function SideAndFilters({
         <ModeSwitch
           kind={mode.kind}
           onChange={(kind) => {
-            // The open pop-up belongs to the other side's pins
+            // The open pop-up belongs to the previous side's pins
             select(null);
             setKind(kind);
           }}

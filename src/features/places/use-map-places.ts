@@ -22,8 +22,8 @@ const NO_TRIP_REGION: Region = {
 };
 
 // What the map tab shows: the active trip's places, or, while exploring a city found with the
-// search bar, that city's places; sights or sweet spots, whichever side is switched on. Pins
-// are ready to draw; tapping one selects it, which opens its pop-up at the bottom
+// search bar, that city's places; sights, sweet spots or restaurants, whichever side is switched
+// on. Pins are ready to draw; tapping one selects it, which opens its pop-up at the bottom
 // (place-preview-card.tsx).
 export function useMapPlaces(mapRef: RefObject<MapView | null>) {
   const { trip, kind, area, saved, suggestions, searchArea } = useTripPlaces();

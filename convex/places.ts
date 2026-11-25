@@ -22,9 +22,9 @@ export const listForTrip = query({
   },
 });
 
-// Saves a suggested place to one of a trip's lists (places to visit or sweet spots). Editors and
-// owners only. Saving the same Google place to the same list twice returns the existing row
-// instead of adding a duplicate pin; a cafe may be on both lists.
+// Saves a suggested place to one of a trip's lists (places to visit, sweet spots or
+// restaurants). Editors and owners only. Saving the same Google place to the same list twice
+// returns the existing row instead of adding a duplicate pin; a place may be on several lists.
 export const add = mutation({
   args: {
     tripId: v.id('trips'),

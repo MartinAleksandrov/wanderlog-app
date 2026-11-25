@@ -2,24 +2,21 @@ import { PlacePhoto } from '@/components/place-photo';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
-import { PLACE_MODES, placeKindOf, type PlaceMode } from '@/features/places';
+import { PLACE_KINDS, PLACE_MODES, placeKindOf, type PlaceMode } from '@/features/places';
 import { tripDays } from '@/features/trips';
 import { cn } from '@/lib/utils';
 import { api } from '@convex/_generated/api';
 import type { Doc, Id } from '@convex/_generated/dataModel';
-import type { PlaceKind } from '@convex/schema';
 import { useQuery } from 'convex/react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { CheckIcon, MapIcon, PlusIcon } from 'lucide-react-native';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import { useItinerary, useItineraryActions, type Stop } from './use-itinerary';
 
-const KINDS: PlaceKind[] = ['sight', 'sweet'];
-
 // The pop-up from the plan tab's "Add places" (a sheet route, src/app/add-stops.tsx, opened
-// with ?day=2): every place saved to the trip, sights and sweet spots in their own groups. Tap
-// one to put it at the end of the day, tap again to take it off. "On day 1" shows where a place
-// is planned already.
+// with ?day=2): every place saved to the trip, sights, sweet spots and restaurants in their own
+// groups. Tap one to put it at the end of the day, tap again to take it off. "On day 1" shows
+// where a place is planned already.
 export function AddStopsSheet() {
   const router = useRouter();
   const params = useLocalSearchParams<{ day?: string }>();
@@ -46,7 +43,7 @@ export function AddStopsSheet() {
   const onThisDay = new Map(
     planned.filter((stop) => stop.day === day).map((stop) => [stop.placeId, stop]),
   );
-  const groups = KINDS.map((kind) => ({
+  const groups = PLACE_KINDS.map((kind) => ({
     mode: PLACE_MODES[kind],
     places: (places ?? []).filter((place) => placeKindOf(place) === kind),
   })).filter((group) => group.places.length > 0);
@@ -72,7 +69,7 @@ export function AddStopsSheet() {
         <View className="items-center gap-3 rounded-2xl border border-dashed border-border p-6">
           <Text className="text-center font-semibold">No saved places yet</Text>
           <Text variant="muted" className="text-center">
-            Save sights and sweet spots on the map first, then plan them here.
+            Save sights, sweet spots and restaurants on the map first, then plan them here.
           </Text>
           <Button variant="outline" onPress={() => router.navigate('/map')}>
             <Icon as={MapIcon} className="size-4" />

@@ -32,7 +32,7 @@ export type PlaceInfo = {
 
 type PlaceCardProps = {
   place: PlaceInfo;
-  // Sights or sweet spots: the button's colours and words
+  // Sights, sweet spots or restaurants: the button's colours and words
   mode: PlaceMode;
   isSaved: boolean;
   // Metres from the phone, when it's in the city (see use-distance.ts)

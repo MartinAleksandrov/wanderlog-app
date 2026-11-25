@@ -34,7 +34,7 @@ export function useExploreCity(
   // a spinner instead of looking frozen
   const [isLocating, setIsLocating] = useState(false);
   const exploring = explore !== null && explore.tripId === tripId ? explore : null;
-  // The explored city's sights or sweet spots, whichever side is switched on
+  // The explored city's sights, sweet spots or restaurants, whichever side is switched on
   const { kind } = usePlaceMode();
   const suggestions = useNearbyPlaces(exploring?.area ?? null, 'explore', kind);
 

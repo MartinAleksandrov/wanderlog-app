@@ -55,9 +55,9 @@ const removeOptimistically: OptimisticUpdate<FunctionArgs<typeof api.places.remo
   }
 };
 
-// Adding places to one of the trip's lists (places to visit or sweet spots) and removing them
-// (removing asks first). Shared by the map's pin pop-up, the places list and the details
-// sheet, so all three behave the same.
+// Adding places to one of the trip's lists (places to visit, sweet spots or restaurants) and
+// removing them (removing asks first). Shared by the map's pin pop-up, the places list and the
+// details sheet, so all three behave the same.
 export function usePlaceActions(tripId: Id<'trips'> | undefined, kind: PlaceKind) {
   const addPlace = useMutation(api.places.add).withOptimisticUpdate(addOptimistically);
   const removePlace = useMutation(api.places.remove).withOptimisticUpdate(removeOptimistically);

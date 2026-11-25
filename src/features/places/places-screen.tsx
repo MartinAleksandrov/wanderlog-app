@@ -42,10 +42,10 @@ type Row = {
 };
 
 // The third tab: the same places as the map, as a list with photos and details, for the side
-// switched on at the top (sights or sweet spots) and the filters picked (kind and "Open now",
-// shared with the map). Saved ones first, then the suggestions that aren't saved yet. In the
-// city, each card says how far away it is and both lists go closest first; otherwise Google's
-// order (most popular first).
+// switched on at the top (sights, sweet spots or restaurants) and the filters picked (kind and
+// "Open now", shared with the map). Saved ones first, then the suggestions that aren't saved
+// yet. In the city, each card says how far away it is and both lists go closest first;
+// otherwise Google's order (most popular first).
 export function PlacesScreen() {
   const router = useRouter();
   const { mode, setKind, filter, setFilterId, openNow, setOpenNow } = usePlaceMode();
@@ -76,7 +76,7 @@ export function PlacesScreen() {
   if (trip === null) {
     return (
       <View className="flex-1 justify-center bg-background p-6">
-        <NoTripState message="Pick a city to see its museums, landmarks, cafes and bakeries here." />
+        <NoTripState message="Pick a city to see its museums, landmarks, cafes and restaurants here." />
       </View>
     );
   }

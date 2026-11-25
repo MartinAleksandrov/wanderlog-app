@@ -24,7 +24,8 @@ type StopRowProps = {
 };
 
 // One stop of the day. The round number is in the place's colour (purple for sights, chocolate
-// for sweet spots); tapping it ticks the stop off (green check, name crossed out) and back.
+// for sweet spots, teal for restaurants); tapping it ticks the stop off (green check, name
+// crossed out) and back.
 // Normally there's a Directions button; while editing, buttons to move it up, down or off the
 // day (the place stays saved to the trip).
 export function StopRow({
