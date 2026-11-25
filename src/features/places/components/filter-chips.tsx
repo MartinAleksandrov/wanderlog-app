@@ -19,8 +19,7 @@ type FilterChipsProps = {
 
 // "Open now 12 | All · Coffee 8 · Bakery 5 · Brunch 2 · Dessert 3", in one row that scrolls
 // sideways (the places list). "Open now" can go with any kind. Only kinds with places in the
-// area show, so a small town doesn't offer empty ones; the picked kind stays even when it has
-// none, so it can be switched off. Tapping the picked kind again goes back to All.
+// area show (see chipCounts). Tapping the picked kind again goes back to All.
 export function FilterChips({
   mode,
   places,
@@ -31,16 +30,13 @@ export function FilterChips({
   contentClassName,
 }: FilterChipsProps) {
   const counts = chipCounts(mode, places, filters);
-  const chips = counts.kinds.filter(
-    ({ filter, count }) => count > 0 || filter.id === filters.filter?.id,
-  );
   // Nothing to filter
   if (places.length === 0) return null;
 
   return (
     <FlatList
       horizontal
-      data={chips}
+      data={counts.kinds}
       keyExtractor={({ filter }) => filter.id}
       // Re-render the chips when the picked one changes
       extraData={filters}

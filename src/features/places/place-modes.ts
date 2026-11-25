@@ -1,4 +1,3 @@
-import type { Doc } from '@convex/_generated/dataModel';
 import type { PlaceKind } from '@convex/schema';
 import {
   BinocularsIcon,
@@ -247,7 +246,5 @@ export const PLACE_MODES: Record<PlaceKind, PlaceMode> = {
   },
 };
 
-// Which list a saved place is on. Places saved before sweet spots existed have no kind.
-export function placeKindOf(place: Doc<'places'>): PlaceKind {
-  return place.kind ?? 'sight';
-}
+// Which list a saved place is on: the backend's own rule, so both sides agree
+export { placeKindOf } from '@convex/lib/placeKind';

@@ -149,13 +149,13 @@ function siteName(url: string): string {
 }
 
 // Google lists the week from Monday; JavaScript counts days from Sunday
-function mondayFirstWeekday(): number {
-  return (new Date().getDay() + 6) % 7;
+function mondayFirstWeekday(now: number): number {
+  return (new Date(now).getDay() + 6) % 7;
 }
 
-// This week's opening hours, today in bold
+// This week's opening hours, today in bold (useNow, so the bold line moves on at midnight)
 function OpeningHours({ lines }: { lines: string[] }) {
-  const today = mondayFirstWeekday();
+  const today = mondayFirstWeekday(useNow());
   return (
     <View className="gap-0.5">
       {lines.map((line, day) => (

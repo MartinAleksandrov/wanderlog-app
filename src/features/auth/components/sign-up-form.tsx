@@ -8,7 +8,7 @@ import { Link } from 'expo-router';
 import { useRef, useState } from 'react';
 import { Pressable, type TextInputInstance, View } from 'react-native';
 
-import { errorMessage } from '../auth-errors';
+import { clerkErrorMessage } from '../auth-errors';
 import { EmailCodeForm } from './email-code-form';
 
 type Stage = 'credentials' | 'email-code';
@@ -34,7 +34,7 @@ export function SignUpForm() {
   async function sendCode() {
     const { error: sendError } = await signUp.verifications.sendEmailCode();
     if (sendError) {
-      setError(errorMessage(sendError));
+      setError(clerkErrorMessage(sendError));
       return;
     }
     setError(null);
@@ -51,7 +51,7 @@ export function SignUpForm() {
       password,
     });
     if (passwordError) {
-      setError(errorMessage(passwordError));
+      setError(clerkErrorMessage(passwordError));
       return;
     }
     await sendCode();
@@ -61,7 +61,7 @@ export function SignUpForm() {
     setError(null);
     const { error: verifyError } = await signUp.verifications.verifyEmailCode({ code });
     if (verifyError) {
-      setError(errorMessage(verifyError));
+      setError(clerkErrorMessage(verifyError));
       return;
     }
 
@@ -71,7 +71,7 @@ export function SignUpForm() {
       return;
     }
     const { error: finalizeError } = await signUp.finalize();
-    if (finalizeError) setError(errorMessage(finalizeError));
+    if (finalizeError) setError(clerkErrorMessage(finalizeError));
   }
 
   async function backToCredentials() {

@@ -1,12 +1,13 @@
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
-import { placeKindOf } from '@/features/places';
 import { DayBookings } from '@/features/bookings';
+import { savedPlaceDetailsHref } from '@/features/places';
 import { NoTripState, todayDayNumber, tripDays, type TripDay } from '@/features/trips';
-import { formatDateRange, todayIsoDate } from '@/lib/dates';
+import { formatDateRange } from '@/lib/dates';
 import { openRouteDirections } from '@/lib/directions';
 import { formatDistance, formatMinutes, routeWalkEstimate } from '@/lib/geo';
+import { useToday } from '@/lib/use-today';
 import { useRouter } from 'expo-router';
 import { MapIcon, NavigationIcon, PlusIcon } from 'lucide-react-native';
 import { Fragment, useState } from 'react';
@@ -29,6 +30,7 @@ export function PlanScreen() {
   // The day tapped; null until then
   const [chosenDay, setChosenDay] = useState<number | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const todayDate = useToday();
 
   if (trip === undefined) {
     return <ActivityIndicator className="flex-1 bg-background" />;
@@ -42,7 +44,7 @@ export function PlanScreen() {
   }
 
   const days = tripDays(trip.startDate, trip.endDate);
-  const today = todayDayNumber(trip.startDate, trip.endDate, todayIsoDate());
+  const today = todayDayNumber(trip.startDate, trip.endDate, todayDate);
   // The day shown: the one tapped, otherwise today while the trip is on, otherwise the first.
   // A day tapped on another trip may not exist on this one.
   const day = chosenDay !== null && chosenDay <= days.length ? chosenDay : (today ?? 1);
@@ -52,16 +54,8 @@ export function PlanScreen() {
 
   // The place's details sheet, from the side it was saved on
   function openStop({ place }: Stop) {
-    if (place.providerPlaceId === undefined) return;
-    router.push({
-      pathname: '/place/[placeId]',
-      params: {
-        placeId: place.providerPlaceId,
-        name: place.name,
-        photoName: place.photoName ?? '',
-        kind: placeKindOf(place),
-      },
-    });
+    const href = savedPlaceDetailsHref(place);
+    if (href) router.push(href);
   }
 
   return (

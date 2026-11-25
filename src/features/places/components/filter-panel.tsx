@@ -28,10 +28,6 @@ export function FilterPanel({
   onClose,
 }: FilterPanelProps) {
   const counts = chipCounts(mode, places, filters);
-  // Kinds with places here; the picked one stays so it can be switched off
-  const kinds = counts.kinds.filter(
-    ({ filter, count }) => count > 0 || filter.id === filters.filter?.id,
-  );
 
   function pick(id: string | null) {
     onSelect(id);
@@ -72,7 +68,7 @@ export function FilterPanel({
           isSelected={filters.filter === null}
           onPress={() => pick(null)}
         />
-        {kinds.map(({ filter, count }) => (
+        {counts.kinds.map(({ filter, count }) => (
           <Chip
             key={filter.id}
             mode={mode}

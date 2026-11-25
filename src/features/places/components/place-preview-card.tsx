@@ -29,6 +29,7 @@ import {
 } from 'react-native';
 import Animated, { FadeInDown, FadeOutDown, LayoutAnimationConfig } from 'react-native-reanimated';
 import { openStatus } from '../open-status';
+import { placeDetailsHref } from '../place-details-href';
 import type { PlaceMode } from '../place-modes';
 import { DirectionsButton } from './directions-button';
 import { OpenBadge } from './open-badge';
@@ -91,10 +92,9 @@ export function PlacePreviewCard({
   // so its button saves to the same list.
   function openDetails() {
     if (placeId === undefined) return;
-    router.push({
-      pathname: '/place/[placeId]',
-      params: { placeId, name: pin.name, photoName: pin.photoName ?? '', kind: mode.kind },
-    });
+    router.push(
+      placeDetailsHref({ placeId, name: pin.name, photoName: pin.photoName, kind: mode.kind }),
+    );
   }
 
   return (

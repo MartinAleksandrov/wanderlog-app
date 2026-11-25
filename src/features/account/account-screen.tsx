@@ -9,7 +9,7 @@ import { Image } from 'expo-image';
 import { ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-// The fourth tab: who is signed in, and sign out. Name, email, photo and join date come from
+// The fifth tab: who is signed in, and sign out. Name, email, photo and join date come from
 // Clerk (the account's owner); the app role and trip count come from our backend.
 export function AccountScreen() {
   const { user } = useUser();

@@ -1,5 +1,4 @@
-import type { ErrorUtils } from 'react-native';
-import { Alert } from 'react-native';
+import { Alert, type ErrorUtils } from 'react-native';
 
 // Where an error was caught, for the log line
 type ErrorSource = 'screen' | 'global' | 'unhandled promise' | 'query' | 'action';

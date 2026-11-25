@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useEffectEvent, type RefObject } from 'react';
 import type MapView from 'react-native-maps';
-import { placeKindOf } from './place-modes';
+import { savedPlaceDetailsHref } from './place-details-href';
 import { useDayRoute, type RouteStop } from './use-day-route';
 
 // Room around a fitted route: the route card at the top, the tab bar and logo at the bottom
@@ -51,16 +51,8 @@ export function useMapRoute(mapRef: RefObject<MapView | null>, onEnter: () => vo
     planDay: () => router.navigate('/plan'),
     // Tapping a stop opens its details sheet
     openStop: ({ place }: RouteStop) => {
-      if (place.providerPlaceId === undefined) return;
-      router.push({
-        pathname: '/place/[placeId]',
-        params: {
-          placeId: place.providerPlaceId,
-          name: place.name,
-          photoName: place.photoName ?? '',
-          kind: placeKindOf(place),
-        },
-      });
+      const href = savedPlaceDetailsHref(place);
+      if (href) router.push(href);
     },
   };
 }

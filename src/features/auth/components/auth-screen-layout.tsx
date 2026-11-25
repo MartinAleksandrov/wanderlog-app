@@ -1,6 +1,6 @@
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
-import { Compass } from 'lucide-react-native';
+import { CompassIcon } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { KeyboardAvoidingView, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -21,7 +21,7 @@ export function AuthScreenLayout({ children }: { children: ReactNode }) {
           >
             <View className="items-center gap-3">
               <View className="size-14 items-center justify-center rounded-2xl bg-primary">
-                <Icon as={Compass} className="size-7 text-primary-foreground" />
+                <Icon as={CompassIcon} className="size-7 text-primary-foreground" />
               </View>
               <Text variant="h3">Wandr</Text>
               <Text variant="muted">Plan every trip, day by day</Text>
