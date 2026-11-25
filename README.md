@@ -1,7 +1,7 @@
 # Wandr
 
 A travel planner app: trips, day-by-day itineraries, saved places, maps and notes.
-Built with React Native, Expo (SDK 57), Expo Router and TypeScript.
+Built with React Native, Expo (SDK 58), Expo Router and TypeScript.
 
 ## Prerequisites
 
