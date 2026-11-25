@@ -6,6 +6,7 @@ import {
   BOOKING_NOTES_MAX_LENGTH,
   BOOKING_PRICE_MAX_CENTS,
   BOOKING_TEXT_MAX_LENGTH,
+  BOOKING_URL_MAX_LENGTH,
 } from './lib/limits';
 import { getCurrentUser, getTripRole, requireTripRole, requireUser } from './lib/permissions';
 import { bookingInput, type BookingInput, type BookingType } from './schema';
@@ -91,9 +92,18 @@ async function requireEditableBooking(ctx: MutationCtx, bookingId: Id<'bookings'
   return booking;
 }
 
-// The text each type must have, and what to tell the user when it's empty
-const REQUIRED_TEXT: Record<BookingType, { field: string; message: string }[]> = {
-  stay: [{ field: 'name', message: "Add where you're staying." }],
+// The fields each type must have, and what to tell the user when one is empty. Checked after
+// trimmedText, which drops empty text: a required field sent as '' counts as missing, instead of
+// slipping past the checks below and failing the table's schema with a generic error.
+const STARTS: { field: string; message: string } = {
+  field: 'startDate',
+  message: 'Add the day it starts.',
+};
+const REQUIRED: Record<BookingType, { field: string; message: string }[]> = {
+  stay: [
+    { field: 'name', message: "Add where you're staying." },
+    { field: 'endDate', message: 'Add the check-out day.' },
+  ],
   flight: [
     { field: 'flightNumber', message: 'Add the flight number.' },
     { field: 'from', message: 'Add where the flight leaves from.' },
@@ -110,6 +120,13 @@ const FIELD_LABELS: Record<string, string> = {
   flightNumber: 'Flight numbers',
   confirmationCode: 'Booking codes',
   notes: 'Notes',
+  website: 'Websites',
+};
+
+// Text longer than the usual BOOKING_TEXT_MAX_LENGTH
+const LONG_TEXT_LIMITS: Record<string, number> = {
+  notes: BOOKING_NOTES_MAX_LENGTH,
+  website: BOOKING_URL_MAX_LENGTH,
 };
 
 // The booking as it's stored: text trimmed, empty optional text left out, and everything checked.
@@ -117,7 +134,7 @@ const FIELD_LABELS: Record<string, string> = {
 function validBooking(input: BookingInput): BookingInput {
   const booking = trimmedText(input);
 
-  for (const { field, message } of REQUIRED_TEXT[booking.type]) {
+  for (const { field, message } of [STARTS, ...REQUIRED[booking.type]]) {
     if (!(field in booking)) throw new ConvexError(message);
   }
 
@@ -156,7 +173,7 @@ function validBooking(input: BookingInput): BookingInput {
 }
 
 // Every text field trimmed. Optional ones left empty are dropped, and required ones too, so the
-// REQUIRED_TEXT check finds them missing.
+// REQUIRED check finds them missing.
 function trimmedText(input: BookingInput): BookingInput {
   const result: Record<string, unknown> = {};
   for (const [field, value] of Object.entries(input)) {
@@ -165,7 +182,7 @@ function trimmedText(input: BookingInput): BookingInput {
       continue;
     }
     const text = value.trim();
-    const limit = field === 'notes' ? BOOKING_NOTES_MAX_LENGTH : BOOKING_TEXT_MAX_LENGTH;
+    const limit = LONG_TEXT_LIMITS[field] ?? BOOKING_TEXT_MAX_LENGTH;
     if (text.length > limit) {
       throw new ConvexError(`${FIELD_LABELS[field] ?? 'Texts'} can be up to ${limit} characters.`);
     }
