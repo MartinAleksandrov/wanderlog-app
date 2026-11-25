@@ -10,13 +10,15 @@ import { PlusIcon } from 'lucide-react-native';
 import { ActivityIndicator, Alert, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ActiveTripCard } from './components/active-trip-card';
+import { HomeBackgroundVideo } from './components/home-background-video';
 import { NoTripState } from './components/no-trip-state';
 import { TripRow } from './components/trip-row';
 import { todayIsoDate } from './trip-dates';
 import type { TripSummary } from './types';
 
 // The first tab: the trip you're planning now (big card), then your upcoming and previous
-// trips. Tapping a trip in a list makes it the active one.
+// trips. Tapping a trip in a list makes it the active one. A landmark video plays behind it all,
+// so text that sits straight on the video is white; cards keep their own background.
 export function HomeScreen() {
   const router = useRouter();
   const { user } = useUser();
@@ -60,16 +62,21 @@ export function HomeScreen() {
   }
 
   return (
-    <View className="flex-1 bg-background">
+    <View className="flex-1">
+      <HomeBackgroundVideo />
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
         <ScrollView contentContainerClassName="gap-6 p-4 pb-10">
           <View className="gap-1">
-            <Text variant="muted">Hi {user?.firstName ?? 'traveller'} 👋</Text>
-            <Text variant="h3">Where to next?</Text>
+            <Text variant="muted" className="text-white/80">
+              Hi {user?.firstName ?? 'traveller'} 👋
+            </Text>
+            <Text variant="h3" className="text-white">
+              Where to next?
+            </Text>
           </View>
 
           {trips === undefined ? (
-            <ActivityIndicator className="py-10" />
+            <ActivityIndicator className="py-10" color="white" />
           ) : current ? (
             <>
               <ActiveTripCard
@@ -83,7 +90,10 @@ export function HomeScreen() {
               </Button>
             </>
           ) : (
-            <NoTripState message="Pick a city and dates, and Wandr suggests the places worth visiting." />
+            <NoTripState
+              className="border-solid bg-card"
+              message="Pick a city and dates, and Wandr suggests the places worth visiting."
+            />
           )}
 
           <TripList title="Current and upcoming" trips={upcoming} onSelect={selectTrip} />
@@ -106,7 +116,7 @@ function TripList({
   if (trips.length === 0) return null;
   return (
     <View className="gap-2">
-      <Text className="text-sm font-semibold text-muted-foreground uppercase">{title}</Text>
+      <Text className="text-sm font-semibold text-white/80 uppercase">{title}</Text>
       {trips.map((trip) => (
         <TripRow key={trip._id} trip={trip} onPress={() => onSelect(trip)} />
       ))}
