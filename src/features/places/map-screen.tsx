@@ -11,6 +11,7 @@ import { DayRouteLayer } from './components/day-route-layer';
 import { ExploreCard } from './components/explore-card';
 import { FilterButton } from './components/filter-button';
 import { FilterPanel } from './components/filter-panel';
+import { LocateButton } from './components/locate-button';
 import { MapSearchBar } from './components/map-search-bar';
 import { MapStatus } from './components/map-status';
 import { ModeSwitch } from './components/mode-switch';
@@ -21,6 +22,7 @@ import { usePlaceMode } from './place-mode-context';
 import type { PlaceMode } from './place-modes';
 import { FEW_PLACES } from './map-area';
 import { useDistanceTo } from './use-distance';
+import { useLocateMe } from './use-locate-me';
 import { useMapPlaces } from './use-map-places';
 import { useMapRoute } from './use-map-route';
 import { useRevealPin } from './use-reveal-pin';
@@ -33,7 +35,8 @@ import { useRevealPin } from './use-reveal-pin';
 // dots where they'd cover each other and grow back as you zoom in (pin-layout.ts). Tapping a pin
 // opens its pop-up at the bottom, sliding the map up first if the pop-up would cover the pin;
 // tapping the map closes it. The search bar finds any city: the map flies there, shows its
-// places, and offers to plan a trip to it (use-explore-city.ts).
+// places, and offers to plan a trip to it (use-explore-city.ts). The button at the bottom right
+// flies to where you are (use-locate-me.ts).
 //
 // Opened from the plan tab with ?day=N, the map shows that day's stops as a numbered route
 // instead (use-map-route.ts).
@@ -49,6 +52,7 @@ export function MapScreen() {
   const revealPin = useRevealPin(mapRef);
   const route = useMapRoute(mapRef, () => select(null));
   const location = useMyLocation();
+  const locateMe = useLocateMe(mapRef);
   const distanceTo = useDistanceTo(places.shownArea);
   // What the map shows right now, updated when it stops moving (sizes the pins)
   const [region, setRegion] = useState<Region | null>(null);
@@ -64,6 +68,9 @@ export function MapScreen() {
 
   const { exploring } = explore;
   const isRoute = route.tripDay !== undefined;
+  // The tapped pin's pop-up. Hidden while typing in the search bar, so it doesn't sit on top of
+  // the keyboard.
+  const isPopUpOpen = selected !== undefined && query === '' && !isRoute;
 
   function selectPin(key: string) {
     setFilterOpen(false);
@@ -89,10 +96,12 @@ export function MapScreen() {
         // shows "Search this area" after every tap
         moveOnMarkerPress={false}
         toolbarEnabled={false}
-        // Google's blue "you are here" dot, once the location is allowed (places tab, "Turn on").
-        // Without Google's own locate button: it would sit under the search bar.
+        // Google's blue "you are here" dot, once the location is allowed (places tab, "Turn on",
+        // or the locate button). Google's own locate button would sit under the search bar, so
+        // the map has its own at the bottom right, which needs to know where the dot is.
         showsUserLocation={location.access === 'granted'}
         showsMyLocationButton={false}
+        onUserLocationChange={locateMe.onUserLocationChange}
         // Sweet spots get a warm cream map without Google's own shop icons
         customMapStyle={mode.mapStyle}
         // Tapping the map (not a pin) closes the pop-up and the filter panel. iOS reports pin
@@ -139,19 +148,7 @@ export function MapScreen() {
         </View>
       </SafeAreaView>
 
-      {trip === null && !exploring ? (
-        <View className="absolute inset-x-3 bottom-3 flex-row items-center gap-3 rounded-2xl border border-border bg-background p-4 shadow-lg">
-          <Icon as={PlaneTakeoffIcon} className="size-6 text-orange-500" />
-          <Text className="flex-1">
-            Search a city above to see its {mode.label.toLowerCase()}, then plan your first trip
-            there.
-          </Text>
-        </View>
-      ) : null}
-      {/* Bottom right: Google's logo sits bottom left. The pin pop-up takes its place. */}
-      {trip && !selected && !isRoute ? <MapLegend mode={mode} /> : null}
-      {/* Hidden while typing in the search bar, so it doesn't sit on top of the keyboard */}
-      {selected && query === '' && !isRoute ? (
+      {isPopUpOpen ? (
         <PlacePreviewCard
           pin={selected}
           mode={mode}
@@ -162,7 +159,14 @@ export function MapScreen() {
           onPlanTrip={explore.planTrip}
           onClose={() => select(null)}
         />
-      ) : null}
+      ) : (
+        <MapBottom
+          mode={mode}
+          locateMe={locateMe}
+          showsHint={trip === null && !exploring}
+          showsLegend={Boolean(trip) && !selected && !isRoute}
+        />
+      )}
     </View>
   );
 }
@@ -301,10 +305,45 @@ function SideAndFilters({
   );
 }
 
+// The map's bottom while no pin pop-up is open, stacked from the right: the locate button, over
+// the legend or (without a trip) the hint to search a city. Google's logo sits bottom left.
+function MapBottom({
+  mode,
+  locateMe,
+  showsHint,
+  showsLegend,
+}: {
+  mode: PlaceMode;
+  locateMe: ReturnType<typeof useLocateMe>;
+  showsHint: boolean;
+  showsLegend: boolean;
+}) {
+  const location = useMyLocation();
+  return (
+    <View pointerEvents="box-none" className="absolute inset-x-3 bottom-3 items-end gap-3">
+      <LocateButton
+        isOn={location.access === 'granted'}
+        isLocating={locateMe.isLocating}
+        onPress={locateMe.locate}
+      />
+      {showsHint ? (
+        <View className="flex-row items-center gap-3 self-stretch rounded-2xl border border-border bg-background p-4 shadow-lg">
+          <Icon as={PlaneTakeoffIcon} className="size-6 text-orange-500" />
+          <Text className="flex-1">
+            Search a city above to see its {mode.label.toLowerCase()}, then plan your first trip
+            there.
+          </Text>
+        </View>
+      ) : null}
+      {showsLegend ? <MapLegend mode={mode} /> : null}
+    </View>
+  );
+}
+
 // What the two pin colours mean, for the side that's switched on
 function MapLegend({ mode }: { mode: PlaceMode }) {
   return (
-    <View className="absolute right-3 bottom-3 gap-1 rounded-lg bg-background/90 px-3 py-2">
+    <View className="gap-1 rounded-lg bg-background/90 px-3 py-2">
       <Legend className={mode.legend.suggested} label="Suggested" />
       <Legend className={mode.legend.saved} label={mode.savedTitle} />
     </View>

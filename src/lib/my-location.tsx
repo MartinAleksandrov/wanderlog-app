@@ -15,8 +15,9 @@ type MyLocation = {
   // Where the phone is, or null (no permission, location off, or not found yet)
   coords: Coordinates | null;
   access: LocationAccess;
-  // Shows the system's "Allow Wandr to access this device's location?" dialog
-  enable: () => void;
+  // Shows the system's "Allow Wandr to access this device's location?" dialog. Resolves to the
+  // answer, so a button can carry on once it's allowed (the map's "show me where I am").
+  enable: () => Promise<LocationAccess>;
 };
 
 const MyLocationContext = createContext<MyLocation | null>(null);
@@ -106,13 +107,16 @@ export function MyLocationProvider({ children }: { children: ReactNode }) {
 
   // Ask for the permission, or, once Android no longer shows the dialog, open the app's page in
   // the phone's settings (coming back re-checks it, see above)
-  function enable() {
-    Location.requestForegroundPermissionsAsync()
-      .then((response) => {
-        setAccess(accessOf(response));
-        if (!response.granted && !response.canAskAgain) void Linking.openSettings();
-      })
-      .catch(() => setAccess('blocked'));
+  async function enable(): Promise<LocationAccess> {
+    try {
+      const next = accessOf(await Location.requestForegroundPermissionsAsync());
+      setAccess(next);
+      if (next === 'blocked') void Linking.openSettings();
+      return next;
+    } catch {
+      setAccess('blocked');
+      return 'blocked';
+    }
   }
 
   return (
