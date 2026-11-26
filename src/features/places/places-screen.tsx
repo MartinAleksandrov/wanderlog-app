@@ -8,9 +8,13 @@ import { useNow } from '@/lib/use-now';
 import { cn } from '@/lib/utils';
 import type { Doc } from '@convex/_generated/dataModel';
 import type { SuggestedPlace } from '@convex/googlePlaces';
+import type { PlaceKind } from '@convex/schema';
 import { useRouter } from 'expo-router';
 import { ExpandIcon, NavigationIcon } from 'lucide-react-native';
+import { useState } from 'react';
 import { ActivityIndicator, Pressable, SectionList, View } from 'react-native';
+import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
+import Animated, { FadeInLeft, FadeInRight, LayoutAnimationConfig } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CrawlCard } from './components/crawl-card';
 import { FilterChips } from './components/filter-chips';
@@ -24,6 +28,7 @@ import { passesFilters } from './place-filters';
 import { usePlaceMode } from './place-mode-context';
 import type { PlaceMode } from './place-modes';
 import { FEW_PLACES, widerSearchArea } from './map-area';
+import { sideAfterSwipe, stepBetween } from './side-swipe';
 import { useTripPlaces } from './trip-places';
 import { useDistanceTo } from './use-distance';
 import { usePlaceActions } from './use-place-actions';
@@ -45,7 +50,8 @@ type Row = {
 // switched on at the top (sights, sweet spots or restaurants) and the filters picked (kind and
 // "Open now", shared with the map). Saved ones first, then the suggestions that aren't saved
 // yet. In the city, each card says how far away it is and both lists go closest first;
-// otherwise Google's order (most popular first).
+// otherwise Google's order (most popular first). Swiping left or right on the list switches to
+// the next or previous side, like pages; the switch stays above the list.
 export function PlacesScreen() {
   const router = useRouter();
   const { mode, setKind, filter, setFilterId, openNow, setOpenNow } = usePlaceMode();
@@ -54,6 +60,8 @@ export function PlacesScreen() {
   const location = useMyLocation();
   const distanceTo = useDistanceTo(area);
   const now = useNow();
+  const swipe = useSideSwipe(mode.kind, setKind);
+  const slideStep = useSlideStep(mode.kind);
 
   // The pop-up with more details. Name and photo go along so its top shows at once, and the
   // side, so its button saves to the same list.
@@ -102,76 +110,124 @@ export function PlacesScreen() {
   return (
     <View className="flex-1 bg-background">
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
-        <SectionList
-          sections={sections}
-          keyExtractor={(row) => row.key}
-          stickySectionHeadersEnabled={false}
-          contentContainerClassName="gap-3 px-4 pb-10"
-          ListHeaderComponent={
-            <View className="gap-3 pt-4">
-              <ModeSwitch kind={mode.kind} onChange={setKind} />
-              <ModeBanner mode={mode} destination={trip.destination} />
-              {location.access === 'ask' ? (
-                <LocationPrompt onPress={() => void location.enable()} />
-              ) : null}
-              <FilterChips
-                mode={mode}
-                places={[...savedRows, ...suggestedRows]}
-                filters={filters}
-                onSelect={setFilterId}
-                onOpenNowChange={setOpenNow}
-                // Full width, so the chips scroll from edge to edge
-                className="-mx-4"
-                contentClassName="px-4 py-1"
-              />
-              {mode.kind === 'sweet' ? (
-                <CrawlCard
-                  mode={mode}
-                  spots={crawlSpots(savedShown, isInCity)}
-                  start={isInCity ? location.coords : null}
+        <ModeSwitch kind={mode.kind} onChange={setKind} className="mt-4 mb-1" />
+        {/* The swipe works anywhere on the list. Scrolling it up or down, or scrolling the chips
+            sideways, takes over the touch first, so those keep working as before. */}
+        <GestureDetector gesture={swipe}>
+          <View className="flex-1 overflow-hidden">
+            {/* A new view for each side (the key), so the list starts at the top and fades in
+                from the side it came from: from the right when moving on, from the left when
+                going back. Not when the tab first opens (skipEntering). */}
+            <LayoutAnimationConfig skipEntering>
+              <Animated.View
+                key={mode.kind}
+                entering={(slideStep === 1 ? FadeInRight : FadeInLeft).duration(200)}
+                className="flex-1"
+              >
+                <SectionList
+                  sections={sections}
+                  keyExtractor={(row) => row.key}
+                  stickySectionHeadersEnabled={false}
+                  contentContainerClassName="gap-3 px-4 pb-10"
+                  ListHeaderComponent={
+                    <View className="gap-3 pt-3">
+                      <ModeBanner mode={mode} destination={trip.destination} />
+                      {location.access === 'ask' ? (
+                        <LocationPrompt onPress={() => void location.enable()} />
+                      ) : null}
+                      <FilterChips
+                        mode={mode}
+                        places={[...savedRows, ...suggestedRows]}
+                        filters={filters}
+                        onSelect={setFilterId}
+                        onOpenNowChange={setOpenNow}
+                        // Full width, so the chips scroll from edge to edge
+                        className="-mx-4"
+                        contentClassName="px-4 py-1"
+                      />
+                      <CrawlCard
+                        mode={mode}
+                        spots={crawlSpots(savedShown, isInCity)}
+                        start={isInCity ? location.coords : null}
+                      />
+                    </View>
+                  }
+                  renderSectionHeader={({ section }) => (
+                    <View className="flex-row items-center justify-between gap-2 pt-3">
+                      <Text className="text-sm font-semibold text-muted-foreground uppercase">
+                        {section.title}
+                      </Text>
+                      {distanceTo ? (
+                        <View className="flex-row items-center gap-1">
+                          <Icon as={NavigationIcon} className="size-3 text-blue-600" />
+                          <Text className="text-xs font-medium text-blue-600">Closest first</Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  )}
+                  renderItem={({ item }) => (
+                    <PlaceCard
+                      place={item.info}
+                      mode={mode}
+                      isSaved={item.saved !== undefined}
+                      distance={item.distance}
+                      openStatus={item.status}
+                      onToggle={() => {
+                        if (item.saved) confirmRemove(item.saved);
+                        else if (item.suggestion) void add(item.suggestion);
+                      }}
+                      onPress={() => openDetails(item)}
+                    />
+                  )}
+                  ListFooterComponent={
+                    <ListFooter
+                      mode={mode}
+                      suggestions={suggestions}
+                      onSearchWider={widerArea ? () => searchArea(widerArea) : undefined}
+                      widerKm={widerArea ? Math.round(widerArea.widthMeters / 1000) : 0}
+                    />
+                  }
                 />
-              ) : null}
-            </View>
-          }
-          renderSectionHeader={({ section }) => (
-            <View className="flex-row items-center justify-between gap-2 pt-3">
-              <Text className="text-sm font-semibold text-muted-foreground uppercase">
-                {section.title}
-              </Text>
-              {distanceTo ? (
-                <View className="flex-row items-center gap-1">
-                  <Icon as={NavigationIcon} className="size-3 text-blue-600" />
-                  <Text className="text-xs font-medium text-blue-600">Closest first</Text>
-                </View>
-              ) : null}
-            </View>
-          )}
-          renderItem={({ item }) => (
-            <PlaceCard
-              place={item.info}
-              mode={mode}
-              isSaved={item.saved !== undefined}
-              distance={item.distance}
-              openStatus={item.status}
-              onToggle={() => {
-                if (item.saved) confirmRemove(item.saved);
-                else if (item.suggestion) void add(item.suggestion);
-              }}
-              onPress={() => openDetails(item)}
-            />
-          )}
-          ListFooterComponent={
-            <ListFooter
-              mode={mode}
-              suggestions={suggestions}
-              onSearchWider={widerArea ? () => searchArea(widerArea) : undefined}
-              widerKm={widerArea ? Math.round(widerArea.widthMeters / 1000) : 0}
-            />
-          }
-        />
+              </Animated.View>
+            </LayoutAnimationConfig>
+          </View>
+        </GestureDetector>
       </SafeAreaView>
     </View>
   );
+}
+
+// The sideways swipe on the list. It starts only once the finger has moved 24 dp sideways, and
+// gives up when it moves 16 dp up or down first, so scrolling the list isn't taken for a swipe.
+// When the finger lifts, sideAfterSwipe decides whether it was far or fast enough to switch.
+// runOnJS: the callback changes React state, so it runs on the JS thread instead of the UI
+// thread (where Gesture Handler runs callbacks by default, for animations).
+function useSideSwipe(kind: PlaceKind, setKind: (kind: PlaceKind) => void) {
+  return usePanGesture({
+    activeOffsetX: [-24, 24],
+    failOffsetY: [-16, 16],
+    runOnJS: true,
+    onDeactivate: (event) => {
+      // Canceled: something else took the touch (the list or the chips started scrolling)
+      if (event.canceled) return;
+      const next = sideAfterSwipe(kind, event.translationX, event.velocityX);
+      if (next !== kind) setKind(next);
+    },
+  });
+}
+
+// Which way the side shown now came from (1: a later side, -1: an earlier one), so its list fades
+// in from that side. The side shown before is state, updated during render when the side changes
+// (React's pattern for "adjust state when a prop changes"): React renders again right away, before
+// anything reaches the screen, so the new list mounts with the right direction.
+function useSlideStep(kind: PlaceKind): 1 | -1 {
+  const [slide, setSlide] = useState<{ kind: PlaceKind; step: 1 | -1 }>({ kind, step: 1 });
+  if (slide.kind !== kind) {
+    const next = { kind, step: stepBetween(slide.kind, kind) };
+    setSlide(next);
+    return next.step;
+  }
+  return slide.step;
 }
 
 // The list's cards: the saved places (with Google's fresh details when they're in the searched
@@ -197,8 +253,9 @@ function toRows(saved: Doc<'places'>[], suggestions: SuggestedPlace[], now: numb
   };
 }
 
-// The sweet-spot crawl picks from the saved spots the list shows (so the chips narrow it too: a
-// dessert crawl). In the city the crawl is for now, so spots known to be closed are left out.
+// The crawl picks from the saved places the list shows (so the chips narrow it too: a dessert
+// crawl, a museum walk). In the city the crawl is for now, so places known to be closed are left
+// out.
 function crawlSpots(rows: Row[], isInCity: boolean): CrawlSpot[] {
   return rows
     .filter((row) => !isInCity || row.status?.tone !== 'closed')

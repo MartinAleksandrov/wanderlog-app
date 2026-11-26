@@ -1,7 +1,7 @@
 import { distanceMeters, routeWalkEstimate } from '@/lib/geo';
 import type { Coordinates } from '@convex/schema';
 
-// A saved sweet spot the crawl may visit
+// A saved place (sight, sweet spot or restaurant) the crawl may visit
 export type CrawlSpot = {
   key: string;
   name: string;
@@ -28,12 +28,12 @@ const RATING_BONUS_METERS = 400;
 // For a spot whose rating isn't known (saved outside the searched area)
 const USUAL_RATING = 4.3;
 
-// The sweet-spot crawl: the best group of 3–4 saved spots close to each other (2 if that's all
-// there is), in the order that walks the least. Every spot takes a turn as the group's centre,
-// with its nearest neighbours within MAX_SPREAD_METERS. More stops win, then the shortest walk
-// with better-rated spots counting as a bit closer. With `start` (the phone, in the city), the
-// walk to the first stop counts too, so the crawl starts near you. null when no two spots are
-// close enough.
+// The crawl (on sights, a sightseeing walk): the best group of 3–4 saved spots close to each
+// other (2 if that's all there is), in the order that walks the least. Every spot takes a turn as
+// the group's centre, with its nearest neighbours within MAX_SPREAD_METERS. More stops win, then
+// the shortest walk with better-rated spots counting as a bit closer. With `start` (the phone, in
+// the city), the walk to the first stop counts too, so the crawl starts near you. null when no
+// two spots are close enough.
 export function planCrawl(spots: CrawlSpot[], start: Coordinates | null): Crawl | null {
   let best: { stops: CrawlSpot[]; cost: number } | null = null;
   for (const centre of spots) {

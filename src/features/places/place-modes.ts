@@ -12,6 +12,7 @@ import {
   CoffeeIcon,
   CroissantIcon,
   EggFriedIcon,
+  EllipsisIcon,
   FishIcon,
   HeartIcon,
   LandmarkIcon,
@@ -43,12 +44,34 @@ export function isPlaceKind(value: unknown): value is PlaceKind {
 }
 
 // A filter chip ("Coffee", "Parks"): a place matches when Google's category for it ("Coffee
-// Shop", "City Park"…) contains one of the words
-export type PlaceFilter = { id: string; label: string; icon: LucideIcon; words: string[] };
+// Shop", "City Park"…) contains one of the words. The "Other" chip turns that around: it matches
+// a place whose category contains none of `otherThan` (its side's other chips' words).
+export type PlaceFilter = {
+  id: string;
+  label: string;
+  icon: LucideIcon;
+  words: string[];
+  otherThan?: string[];
+};
 
 export function matchesFilter(category: string | undefined, filter: PlaceFilter): boolean {
   const text = category?.toLowerCase() ?? '';
+  if (filter.otherThan) return !filter.otherThan.some((word) => text.includes(word));
   return filter.words.some((word) => text.includes(word));
+}
+
+// A side's chips plus "Other" at the end, for the places none of them match: restaurants Google
+// files as plain "Restaurant" or "Bulgarian Restaurant", a juice bar among the sweet spots, and
+// places without a category
+function withOther(filters: PlaceFilter[]): PlaceFilter[] {
+  const other: PlaceFilter = {
+    id: 'other',
+    label: 'Other',
+    icon: EllipsisIcon,
+    words: [],
+    otherThan: filters.flatMap((filter) => filter.words),
+  };
+  return [...filters, other];
 }
 
 // How one kind of pin looks (see components/place-pin.tsx)
@@ -103,6 +126,9 @@ export type PlaceMode = {
   bannerIcon: string;
   // The legend's sample dots
   legend: { suggested: string; saved: string };
+  // The crawl card above the saved places (crawl-card.tsx): its title, its button, and the
+  // dotted path between its numbered stops
+  crawl: { title: string; button: string; path: string };
   // The filter chips under the switch, in this order
   filters: PlaceFilter[];
   // Google map styling; [] is Google's normal map
@@ -189,6 +215,7 @@ export const PLACE_MODES: Record<PlaceKind, PlaceMode> = {
     banner: 'bg-orange-50 dark:bg-orange-950/40',
     bannerIcon: 'bg-orange-500',
     legend: { suggested: 'border-orange-500 bg-white', saved: 'border-white bg-purple-600' },
+    crawl: { title: 'Sightseeing walk', button: 'Start the walk', path: 'border-orange-300' },
     filters: [
       { id: 'museums', label: 'Museums', icon: LandmarkIcon, words: ['museum', 'gallery'] },
       {
@@ -260,7 +287,8 @@ export const PLACE_MODES: Record<PlaceKind, PlaceMode> = {
     banner: 'bg-pink-50 dark:bg-pink-950/40',
     bannerIcon: 'bg-pink-500',
     legend: { suggested: 'border-pink-500 bg-white', saved: 'border-white bg-amber-900' },
-    filters: [
+    crawl: { title: 'Sweet-spot crawl', button: 'Start the crawl', path: 'border-pink-300' },
+    filters: withOther([
       // "tea house", not "tea": that would also match "Steak House"
       {
         id: 'coffee',
@@ -281,7 +309,7 @@ export const PLACE_MODES: Record<PlaceKind, PlaceMode> = {
         icon: CakeSliceIcon,
         words: ['dessert', 'cake', 'ice cream', 'gelato', 'donut', 'chocolate', 'confection'],
       },
-    ],
+    ]),
     mapStyle: CREAM_MAP,
   },
   restaurant: {
@@ -331,9 +359,11 @@ export const PLACE_MODES: Record<PlaceKind, PlaceMode> = {
     banner: 'bg-red-50 dark:bg-red-950/40',
     bannerIcon: 'bg-red-500',
     legend: { suggested: 'border-red-500 bg-white', saved: 'border-white bg-teal-700' },
+    // A food crawl: a few saved restaurants close together, to share a dish at each
+    crawl: { title: 'Food crawl', button: 'Start the crawl', path: 'border-red-300' },
     // Matched against Google's category ("Italian Restaurant", "Steak House"…). Local places
-    // filed as plain "Restaurant" only show under "All".
-    filters: [
+    // filed as plain "Restaurant" show under "Other".
+    filters: withOther([
       {
         id: 'italian',
         label: 'Italian',
@@ -365,7 +395,7 @@ export const PLACE_MODES: Record<PlaceKind, PlaceMode> = {
       },
       { id: 'seafood', label: 'Seafood', icon: FishIcon, words: ['seafood', 'fish'] },
       { id: 'veggie', label: 'Veggie', icon: SaladIcon, words: ['vegan', 'vegetarian'] },
-    ],
+    ]),
     mapStyle: SLATE_MAP,
   },
 };

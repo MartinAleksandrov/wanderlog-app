@@ -12,17 +12,18 @@ import { planCrawl, type Crawl, type CrawlSpot } from '../crawl';
 import type { PlaceMode } from '../place-modes';
 
 type CrawlCardProps = {
+  // Sights, sweet spots or restaurants: the card's title, button and colours
   mode: PlaceMode;
-  // The saved sweet spots to pick from
+  // The saved places to pick from
   spots: CrawlSpot[];
   // The phone, when it's in the city: the crawl starts near it, and Google Maps routes from it
   start: Coordinates | null;
 };
 
-// The sweet-spot crawl, above "Your sweet spots": the 3–4 saved spots that make the best walk
-// together (crawl.ts), in walking order, and one button that opens the whole walk in Google Maps
-// as a single route with stops on the way (Maps URLs, so it costs nothing). Shown once at least
-// two saved spots are close enough for one walk.
+// The crawl above the saved places ("Sightseeing walk", "Sweet-spot crawl", "Food crawl"): the
+// 3–4 saved places that make the best walk together (crawl.ts), in walking order, and one button
+// that opens the whole walk in Google Maps as a single route with stops on the way (Maps URLs, so
+// it costs nothing). Shown once at least two saved places are close enough for one walk.
 export function CrawlCard({ mode, spots, start }: CrawlCardProps) {
   const crawl = planCrawl(spots, start);
   if (crawl === null) return null;
@@ -35,7 +36,7 @@ export function CrawlCard({ mode, spots, start }: CrawlCardProps) {
           <Icon as={RouteIcon} className="size-5 text-white" />
         </View>
         <View className="flex-1 gap-0.5">
-          <Text className="text-base font-semibold">Sweet-spot crawl</Text>
+          <Text className="text-base font-semibold">{mode.crawl.title}</Text>
           <Text variant="muted" className="text-xs">
             {summary(crawl)}
           </Text>
@@ -47,7 +48,7 @@ export function CrawlCard({ mode, spots, start }: CrawlCardProps) {
           <Fragment key={stop.key}>
             {/* A dotted path between the numbered stops */}
             {index > 0 ? (
-              <View className="ml-[11px] h-3 border-l-2 border-dotted border-pink-300" />
+              <View className={cn('ml-[11px] h-3 border-l-2 border-dotted', mode.crawl.path)} />
             ) : null}
             <View className="flex-row items-center gap-3">
               <View
@@ -73,7 +74,7 @@ export function CrawlCard({ mode, spots, start }: CrawlCardProps) {
         onPress={() => openRouteDirections(stops, { startAtFirst: start === null })}
       >
         <Icon as={FootprintsIcon} className="size-4 text-white" />
-        <Text className="text-white">Start the crawl</Text>
+        <Text className="text-white">{mode.crawl.button}</Text>
       </Button>
     </View>
   );
