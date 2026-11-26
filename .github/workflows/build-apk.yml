@@ -1,0 +1,42 @@
+name: Build APK
+
+# Merges don't build. A build starts only when you push a version tag on the commit you choose:
+#   git tag v1.4.0 && git push origin v1.4.0
+on:
+  push:
+    tags: ['v*']
+
+# Least privilege: the job only reads the code and uploads it to EAS
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: eas build (android, preview)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }} # eas-cli logs in with this, no `eas login` needed
+      HUSKY: 0 # no git hooks on CI machines
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # pnpm must exist before setup-node, so setup-node can cache pnpm's store
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      # eas-cli evaluates app.config.ts, which needs node_modules
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # --no-wait: upload the project and finish; the build itself runs on EAS
+      # and reads its env vars from the EAS "preview" environment
+      - name: Start EAS build
+        run: npx eas-cli@latest build --platform android --profile preview --non-interactive --no-wait
