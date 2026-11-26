@@ -19,8 +19,10 @@ type PlacePhotoProps = {
 
 // A place's photo. Without one (Google has none, or it fails to load) it shows an icon for the
 // kind of place on a soft orange background instead of an empty box. expo-image caches photos
-// on the device, so a photo seen once doesn't cost another Google request. (Map pins draw their
-// own, see place-pin.tsx.)
+// on the device, so a photo seen once doesn't cost another Google request. The cache is in memory
+// as well as on disk ('memory-disk'; the default is disk only): a card scrolled back into view,
+// or the pop-up opened from it with the same 900 px photo, shows it at once instead of reading
+// and decoding the file again.
 export function PlacePhoto({
   photoName,
   category,
@@ -45,6 +47,7 @@ export function PlacePhoto({
           source={{ uri: placePhotoUrl(photoName, width) }}
           style={StyleSheet.absoluteFill}
           contentFit="cover"
+          cachePolicy="memory-disk"
           transition={150}
           onError={() => setFailedName(photoName)}
         />

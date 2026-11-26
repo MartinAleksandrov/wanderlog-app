@@ -13,6 +13,7 @@ import { PlacePin } from './place-pin';
 export type Pin = {
   key: string;
   name: string;
+  // Not drawn on the pin; the pop-up shows it until Google's details arrive
   photoName?: string;
   category?: string;
   coordinates: Coordinates;
@@ -34,7 +35,7 @@ type PinLayerProps = {
 };
 
 // All the pins on the map (rendered inside <MapView>). Works out for the current zoom how much
-// room each pin has: photo and name, just the photo, or a small dot (pin-layout.ts).
+// room each pin has: icon and name, just the icon, or a small dot (pin-layout.ts).
 export function PinLayer({ pins, region, selectedKey, onSelect, kind }: PinLayerProps) {
   // The map fills the screen's width
   const { width: mapWidth } = useWindowDimensions();
@@ -44,10 +45,8 @@ export function PinLayer({ pins, region, selectedKey, onSelect, kind }: PinLayer
     const size = sizes.get(pin.key) ?? 'mini';
     const isSaved = pin.saved !== undefined;
     const isSelected = pin.key === selectedKey;
-    // Changes whenever the pin's look does. The photo too: a saved place's pin starts with the
-    // photo stored when it was saved and gets Google's fresh one when the search comes back (see
-    // use-map-places.ts), and a pin only picks up a new photo when it's mounted again.
-    const look = `${kind}:${pin.key}:${size}:${isSaved ? 'saved' : 'suggested'}:${isSelected ? 'open' : ''}:${pin.photoName ?? ''}`;
+    // Changes whenever the pin's look does
+    const look = `${kind}:${pin.key}:${size}:${isSaved ? 'saved' : 'suggested'}:${isSelected ? 'open' : ''}`;
     return { pin, size, isSaved, isSelected, look };
   });
   const drawing = useRedrawWhenShown(looks.map(({ look }) => look));
@@ -64,7 +63,6 @@ export function PinLayer({ pins, region, selectedKey, onSelect, kind }: PinLayer
       <PlacePin
         key={key}
         name={pin.name}
-        photoName={pin.photoName}
         category={pin.category}
         coordinates={pin.coordinates}
         kind={kind}
@@ -78,14 +76,13 @@ export function PinLayer({ pins, region, selectedKey, onSelect, kind }: PinLayer
 }
 
 // Pins mounted while the map tab is hidden come out blank: Android draws a pin into a picture
-// once its photo has loaded (see place-pin.tsx), and a hidden map never lays its pins out on
+// once it has been laid out (see place-pin.tsx), and a hidden map never lays its pins out on
 // screen, so the picture is an empty white label with its tail in the wrong place. The map stays
 // mounted on other tabs (see the tabs layout), and its pins change there: picking another side on
 // the places tab, saving a place from the list. So when the map is shown again after a pin was
 // added or changed while it was hidden (even if the pins are back as they were), this returns a
 // new number for the pins' keys: every pin is mounted again and drawn now that it's on screen.
-// Their photos are in the phone's memory by then, so that's quick. Pins only taken away while
-// hidden don't count: the ones left were drawn on screen.
+// Pins only taken away while hidden don't count: the ones left were drawn on screen.
 //
 // "Shown" means the map is the tab picked in the tab bar. Not useIsFocused(): that's also false
 // while the place details sheet is open over the map, and the map is still on screen behind it,
