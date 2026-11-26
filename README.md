@@ -69,10 +69,11 @@ builds are never affected. To turn it off, delete the file and run the prebuild 
 | `pnpm typecheck`    | TypeScript check (`tsc --noEmit`)                     |
 | `pnpm format`       | Format all files with Prettier                        |
 | `pnpm format:check` | Check formatting without writing                      |
-| `pnpm check`        | Lint + typecheck + format check (what CI runs)        |
+| `pnpm check`        | Lint + typecheck + format check (CI adds the doctors) |
 | `pnpm fix`          | Format and auto-fix lint issues                       |
 | `pnpm doctor:react` | React Doctor: React anti-patterns, a11y, security     |
 | `pnpm doctor:expo`  | Expo Doctor; versions checked against installed SDK   |
+| `pnpm db`           | Start Convex dev: syncs `convex/` and `.env.local`    |
 
 Add dependencies with `npx expo install <package>` so versions match the Expo SDK.
 Use `pnpm add -D` only for dev tools unrelated to React Native.

@@ -1,6 +1,7 @@
 import { Text } from '@/components/ui/text';
 import type { TripDay } from '@/features/trips';
 import { cn } from '@/lib/utils';
+import { useEffect, useRef } from 'react';
 import { FlatList, Pressable, View } from 'react-native';
 
 type DayPickerProps = {
@@ -16,9 +17,25 @@ type DayPickerProps = {
 // The trip's days side by side, swipe for more: "Today / Day 2 / 24 Nov", with a dot per stop
 // planned (up to 5). The picked day is dark; the others are cards. A list that only draws the
 // days near the screen, since a long trip can have weeks of them.
+//
+// The picked day scrolls to the middle: when the plan opens (today may be day 12, far off to the
+// right) and when another day is picked. A day the list hasn't drawn yet can't be scrolled to
+// directly (the list doesn't know where it is): onScrollToIndexFailed first jumps to about where
+// it should be, which draws it, then tries again.
 export function DayPicker({ days, selected, today, stopCounts, onSelect }: DayPickerProps) {
+  const listRef = useRef<FlatList<TripDay>>(null);
+  const index = selected - 1;
+  const dayCount = days.length;
+
+  useEffect(() => {
+    if (index >= 0 && index < dayCount) {
+      listRef.current?.scrollToIndex({ index, viewPosition: 0.5 });
+    }
+  }, [index, dayCount]);
+
   return (
     <FlatList
+      ref={listRef}
       horizontal
       data={days}
       keyExtractor={(tripDay) => String(tripDay.day)}
@@ -27,6 +44,18 @@ export function DayPicker({ days, selected, today, stopCounts, onSelect }: DayPi
       showsHorizontalScrollIndicator={false}
       className="grow-0"
       contentContainerClassName="gap-2 px-4"
+      onScrollToIndexFailed={({ index: missed, averageItemLength }) => {
+        listRef.current?.scrollToOffset({ offset: missed * averageItemLength, animated: false });
+        setTimeout(() => {
+          // Another trip with fewer days may have replaced the list meanwhile: scrolling past its
+          // end throws, and the effect above already scrolls the new one
+          try {
+            listRef.current?.scrollToIndex({ index: missed, viewPosition: 0.5 });
+          } catch {
+            // nothing to do
+          }
+        }, 100);
+      }}
       renderItem={({ item }) => (
         <DayChip
           tripDay={item}

@@ -55,7 +55,13 @@ export function AddStopsSheet() {
   }
 
   return (
-    <ScrollView className="flex-1 bg-background" contentContainerClassName="gap-5 px-5 pt-3 pb-12">
+    // nestedScrollEnabled: without it, scrolling back up drags the sheet down and closes it
+    // (see place-details-sheet.tsx)
+    <ScrollView
+      nestedScrollEnabled
+      className="flex-1 bg-background"
+      contentContainerClassName="gap-5 px-5 pt-3 pb-12"
+    >
       {/* A handle, so the sheet looks draggable (the native one is iOS only) */}
       <View className="h-1 w-10 self-center rounded-full bg-border" />
       <View className="gap-1">

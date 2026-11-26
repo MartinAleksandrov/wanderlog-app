@@ -4,6 +4,9 @@
 
 export const TRIP_NAME_MAX_LENGTH = 60;
 export const TRIP_NOTES_MAX_LENGTH = 2000;
+// The longest a trip can be, first and last day included. The plan draws every day (a chip and
+// a heading), so a mistyped year (2036 for 2026) would otherwise make thousands of them.
+export const TRIP_MAX_DAYS = 30;
 
 // The travel journal: a longer story for the whole city, a shorter note per place
 export const TRIP_JOURNAL_MAX_LENGTH = 4000;

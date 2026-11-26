@@ -3,7 +3,7 @@ import type { Doc } from './_generated/dataModel';
 import { mutation, query, type QueryCtx } from './_generated/server';
 import { tripDayCount } from './itinerary';
 import { isCalendarDate } from './lib/dates';
-import { TRIP_NAME_MAX_LENGTH, TRIP_NOTES_MAX_LENGTH } from './lib/limits';
+import { TRIP_MAX_DAYS, TRIP_NAME_MAX_LENGTH, TRIP_NOTES_MAX_LENGTH } from './lib/limits';
 import { getCurrentUser, getTripRole, requireTripRole, requireUser } from './lib/permissions';
 import { placeKindOf } from './lib/placeKind';
 import { coordinates, type PlaceKind } from './schema';
@@ -90,13 +90,17 @@ async function findActiveTrip(ctx: QueryCtx, user: Doc<'users'>) {
   return trip === null ? null : { ...trip, role: newest.role };
 }
 
-// The app only sends valid dates; this guards against other callers of the public API
+// The app only sends valid dates; this guards against other callers of the public API. A trip
+// saved before the length limit existed can still be opened; saving it needs dates within it.
 function requireValidDates(startDate: string, endDate: string) {
   if (!isCalendarDate(startDate) || !isCalendarDate(endDate)) {
     throw new ConvexError('Dates must be real days, written like 2027-05-30.');
   }
   if (endDate < startDate) {
     throw new ConvexError('The trip has to end on or after the day it starts.');
+  }
+  if (tripDayCount({ startDate, endDate }) > TRIP_MAX_DAYS) {
+    throw new ConvexError(`Trips can be up to ${TRIP_MAX_DAYS} days long.`);
   }
 }
 
