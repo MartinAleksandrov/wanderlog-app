@@ -155,6 +155,8 @@ function RootNavigator() {
             name="trip/[tripId]/bookings"
             options={{ headerShown: true, title: 'Bookings' }}
           />
+          {/* A past trip's journal; the screen sets the trip's name as its title */}
+          <Stack.Screen name="journal/[tripId]" options={{ headerShown: true, title: 'Journal' }} />
           {/* The form sets its own title ("Add a stay", "Edit flight") */}
           <Stack.Screen
             name="trip/[tripId]/booking"

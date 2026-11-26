@@ -12,6 +12,7 @@ import type * as bookings from "../bookings.js";
 import type * as googlePlaces from "../googlePlaces.js";
 import type * as http from "../http.js";
 import type * as itinerary from "../itinerary.js";
+import type * as journal from "../journal.js";
 import type * as lib_dates from "../lib/dates.js";
 import type * as lib_limits from "../lib/limits.js";
 import type * as lib_permissions from "../lib/permissions.js";
@@ -31,6 +32,7 @@ declare const fullApi: ApiFromModules<{
   googlePlaces: typeof googlePlaces;
   http: typeof http;
   itinerary: typeof itinerary;
+  journal: typeof journal;
   "lib/dates": typeof lib_dates;
   "lib/limits": typeof lib_limits;
   "lib/permissions": typeof lib_permissions;

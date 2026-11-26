@@ -5,6 +5,12 @@
 export const TRIP_NAME_MAX_LENGTH = 60;
 export const TRIP_NOTES_MAX_LENGTH = 2000;
 
+// The travel journal: a longer story for the whole city, a shorter note per place
+export const TRIP_JOURNAL_MAX_LENGTH = 4000;
+export const PLACE_NOTES_MAX_LENGTH = 1000;
+// Stars in the journal: 1 to 5
+export const MAX_RATING = 5;
+
 // Bookings: names, codes, addresses and the like; notes are longer
 export const BOOKING_TEXT_MAX_LENGTH = 200;
 export const BOOKING_NOTES_MAX_LENGTH = 2000;
