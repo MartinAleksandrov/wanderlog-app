@@ -18,6 +18,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { LogBox } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useUniwind } from 'uniwind';
 
 // First thing: errors outside rendering (button handlers, timers, forgotten promises) get
@@ -74,23 +75,29 @@ export default function RootLayout() {
   const { theme } = useUniwind();
 
   return (
-    // 1. Clerk: who the user is. Keeps the session (stored encrypted on the device by tokenCache).
-    <ClerkProvider publishableKey={env.clerkPublishableKey} tokenCache={tokenCache}>
-      {/* 2. Convex: our backend. Asks Clerk for a fresh token and sends it with every request.
+    // 0. Gesture Handler's root: a native view that sees every touch before React Native does,
+    //    so gestures (swiping between sides in the places tab) can be told apart from scrolling.
+    //    Gestures anywhere below it work; without it they're never recognised.
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      {/* 1. Clerk: who the user is. Keeps the session (stored encrypted on the device by
+        tokenCache). */}
+      <ClerkProvider publishableKey={env.clerkPublishableKey} tokenCache={tokenCache}>
+        {/* 2. Convex: our backend. Asks Clerk for a fresh token and sends it with every request.
           Passing the useAuth hook itself (not calling it) is Convex's official Clerk API: the
           provider calls it internally. React Doctor flags any hook passed as a value, so this
           one line is exempted on purpose. */}
-      {/* react-doctor-disable-next-line react-hooks-js/hooks */}
-      <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
-        <QueryClientProvider client={queryClient}>
-          <ThemeProvider value={NAV_THEME[theme ?? 'light']}>
-            <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
-            <RootNavigator />
-            <PortalHost />
-          </ThemeProvider>
-        </QueryClientProvider>
-      </ConvexProviderWithClerk>
-    </ClerkProvider>
+        {/* react-doctor-disable-next-line react-hooks-js/hooks */}
+        <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
+          <QueryClientProvider client={queryClient}>
+            <ThemeProvider value={NAV_THEME[theme ?? 'light']}>
+              <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
+              <RootNavigator />
+              <PortalHost />
+            </ThemeProvider>
+          </QueryClientProvider>
+        </ConvexProviderWithClerk>
+      </ClerkProvider>
+    </GestureHandlerRootView>
   );
 }
 

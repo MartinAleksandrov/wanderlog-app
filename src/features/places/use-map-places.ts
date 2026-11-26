@@ -94,16 +94,24 @@ function toPins(saved: Doc<'places'>[], suggestions: SuggestedPlace[]): Pin[] {
   const suggestionById = new Map(suggestions.map((place) => [place.providerPlaceId, place]));
   const savedIds = new Set(saved.map((place) => place.providerPlaceId));
   return [
-    ...saved.map((place) => ({
-      key: place.providerPlaceId ?? place._id,
-      name: place.name,
-      photoName: place.photoName,
-      category: place.category,
-      coordinates: place.coordinates,
-      saved: place,
+    ...saved.map((place) => {
       // Google's fresh rating, description and photos when the place is in the searched area
-      suggestion: place.providerPlaceId ? suggestionById.get(place.providerPlaceId) : undefined,
-    })),
+      const suggestion = place.providerPlaceId
+        ? suggestionById.get(place.providerPlaceId)
+        : undefined;
+      return {
+        key: place.providerPlaceId ?? place._id,
+        name: place.name,
+        // Google's photo names expire, so the one stored when the place was saved can stop
+        // working; the fresh one from the search is used whenever there is one (as the places
+        // list does)
+        photoName: suggestion?.photoName ?? place.photoName,
+        category: place.category,
+        coordinates: place.coordinates,
+        saved: place,
+        suggestion,
+      };
+    }),
     ...suggestions
       .filter((place) => !savedIds.has(place.providerPlaceId))
       .map((place) => ({

@@ -1,5 +1,4 @@
 import { PlacePhoto } from '@/components/place-photo';
-import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { formatDistance } from '@/lib/geo';
@@ -11,7 +10,6 @@ import { Pressable, View } from 'react-native';
 import Animated, { LayoutAnimationConfig } from 'react-native-reanimated';
 import type { OpenStatus } from '../open-status';
 import type { PlaceMode } from '../place-modes';
-import { DirectionsButton } from './directions-button';
 import { OpenBadge } from './open-badge';
 import { SAVED_POP } from './saved-pop';
 
@@ -25,14 +23,12 @@ export type PlaceInfo = {
   category?: string;
   rating?: number;
   ratingCount?: number;
-  summary?: string;
-  address?: string;
   hours?: PlaceHours;
 };
 
 type PlaceCardProps = {
   place: PlaceInfo;
-  // Sights, sweet spots or restaurants: the button's colours and words
+  // Sights, sweet spots or restaurants: the save button's colours and words
   mode: PlaceMode;
   isSaved: boolean;
   // Metres from the phone, when it's in the city (see use-distance.ts)
@@ -40,13 +36,19 @@ type PlaceCardProps = {
   // "Open · closes 18:00", when its hours are known
   openStatus?: OpenStatus | null;
   onToggle: () => void;
-  // Tapping the card (anywhere but the buttons) opens the place's pop-up with more details
+  // Tapping the card (anywhere but the save button) opens the place's pop-up with the rest
   onPress: () => void;
 };
 
-// One place in the places tab: photo, type and rating, whether it's open, Google's short
-// description, how far away it is and its address, a button that saves it (suggestion colour) or
-// shows it's saved (saved colour, like the pins), and directions in Google Maps.
+// One place in the places tab, kept short so the photos do the talking: a big photo across the
+// card with the save button on its corner, then the name, type and rating, whether it's open and
+// how far away it is. Google's description, the address, more photos and directions are one tap
+// away, in the place's pop-up. The photo is asked for 900 px wide, like the pop-up's photos, so
+// the pop-up shows it at once from the phone's cache instead of paying Google for it again.
+//
+// The save button sits next to the card's pressable part, not inside it: a screen reader reads a
+// button as one element and skips the buttons inside it, so a save button inside the card could
+// never be reached. Drawn after it, the save button is on top and gets its own taps.
 export function PlaceCard({
   place,
   mode,
@@ -57,55 +59,68 @@ export function PlaceCard({
   onPress,
 }: PlaceCardProps) {
   return (
+    <View className={cn('overflow-hidden rounded-2xl border bg-card', mode.cardBorder)}>
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityHint="Shows more about this place"
+        className="active:opacity-90"
+      >
+        <PlacePhoto
+          photoName={place.photoName}
+          category={place.category}
+          width={900}
+          className="h-44 w-full"
+          iconClassName="size-12"
+        />
+        <View className="gap-1 px-4 pt-3 pb-4">
+          <Text className="text-base font-semibold" numberOfLines={1}>
+            {place.name}
+          </Text>
+          <KindAndRating place={place} />
+          <OpenAndDistance status={openStatus} distance={distance} />
+        </View>
+      </Pressable>
+      <SaveButton
+        mode={mode}
+        isSaved={isSaved}
+        onPress={onToggle}
+        className="absolute top-3 right-3"
+      />
+    </View>
+  );
+}
+
+// The round button on the photo: a + in the side's suggestion colour, or its saved mark (check,
+// heart or bookmark) in the saved colour, like the pins. The mark pops in when saved here.
+function SaveButton({
+  mode,
+  isSaved,
+  onPress,
+  className,
+}: {
+  mode: PlaceMode;
+  isSaved: boolean;
+  onPress: () => void;
+  className?: string;
+}) {
+  return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityHint="Shows more about this place"
+      accessibilityLabel={isSaved ? mode.removeLabel : mode.addLabel}
+      hitSlop={8}
       className={cn(
-        'flex-row gap-3 rounded-xl border bg-card p-3 active:bg-accent',
-        mode.cardBorder,
+        'size-11 items-center justify-center rounded-full border-2 border-white shadow-md',
+        isSaved ? mode.savedButton : mode.addButton,
+        className,
       )}
     >
-      <PlacePhoto
-        photoName={place.photoName}
-        category={place.category}
-        width={300}
-        className="size-24 rounded-lg"
-        iconClassName="size-9"
-      />
-      <View className="flex-1 gap-1">
-        <Text className="font-semibold" numberOfLines={2}>
-          {place.name}
-        </Text>
-        <KindAndRating place={place} />
-        {openStatus ? <OpenBadge status={openStatus} /> : null}
-        {place.summary ? (
-          <Text className="text-sm" numberOfLines={3}>
-            {place.summary}
-          </Text>
-        ) : null}
-        <DistanceAndAddress address={place.address} distance={distance} />
-        <View className="mt-1 flex-row flex-wrap gap-2">
-          <Button
-            size="sm"
-            onPress={onToggle}
-            className={isSaved ? mode.savedButton : mode.addButton}
-          >
-            {/* The heart or check pops in when saved here; the + doesn't animate */}
-            <LayoutAnimationConfig skipEntering>
-              <Animated.View
-                key={isSaved ? 'saved' : 'add'}
-                entering={isSaved ? SAVED_POP : undefined}
-              >
-                <Icon as={isSaved ? mode.savedIcon : PlusIcon} className="size-4 text-white" />
-              </Animated.View>
-            </LayoutAnimationConfig>
-            <Text className="text-white">{isSaved ? mode.savedLabel : mode.addLabel}</Text>
-          </Button>
-          {/* The same round blue arrow as on the map, so both buttons fit on one row */}
-          <DirectionsButton destination={place} className="size-9" />
-        </View>
-      </View>
+      <LayoutAnimationConfig skipEntering>
+        <Animated.View key={isSaved ? 'saved' : 'add'} entering={isSaved ? SAVED_POP : undefined}>
+          <Icon as={isSaved ? mode.savedIcon : PlusIcon} className="size-5 text-white" />
+        </Animated.View>
+      </LayoutAnimationConfig>
     </Pressable>
   );
 }
@@ -124,18 +139,15 @@ function KindAndRating({ place }: { place: PlaceInfo }) {
   );
 }
 
-// "350 m away · 12 Baker Street": the distance first, so a long address can't cut it off
-function DistanceAndAddress({ address, distance }: { address?: string; distance?: number }) {
-  if (!address && distance === undefined) return null;
+// "● Open · closes 18:00   350 m away" on one line, wrapping when the phone is narrow
+function OpenAndDistance({ status, distance }: { status?: OpenStatus | null; distance?: number }) {
+  if (!status && distance === undefined) return null;
   return (
-    <Text variant="muted" numberOfLines={1}>
+    <View className="flex-row flex-wrap items-center gap-x-3 gap-y-1">
+      {status ? <OpenBadge status={status} /> : null}
       {distance === undefined ? null : (
-        <Text className="text-sm font-semibold text-foreground">
-          {formatDistance(distance)} away
-        </Text>
+        <Text className="text-sm font-semibold">{formatDistance(distance)} away</Text>
       )}
-      {distance !== undefined && address ? ' · ' : null}
-      {address}
-    </Text>
+    </View>
   );
 }

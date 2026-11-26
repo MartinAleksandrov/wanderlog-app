@@ -9,7 +9,7 @@ export type PlaceFilters = { filter: PlaceFilter | null; openNow: boolean };
 export function passesFilters(place: FilterablePlace, { filter, openNow }: PlaceFilters): boolean {
   // Hours unknown counts as not open, as in Google Maps
   if (openNow && !place.isOpen) return false;
-  // Places without a category only show under All
+  // Places without a category show under All, and under "Other" where a side has it
   return filter === null || matchesFilter(place.category, filter);
 }
 
