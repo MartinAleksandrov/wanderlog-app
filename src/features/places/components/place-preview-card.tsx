@@ -281,6 +281,11 @@ function SavedTag({ mode }: { mode: PlaceMode }) {
 
 // The place's photos side by side; swipe for more. Only photos near the screen are loaded, so
 // photos nobody swipes to aren't requested (each one is a paid Google request).
+//
+// The first photo is asked for 900 px wide, like the places list's cards and the single photo
+// below, so it's the same address the phone has cached: a place already seen in the list, or
+// whose stored photo showed while Google's details loaded, costs no second request for it. The
+// rest are small (480 px), since nothing else shows them.
 function PhotoRow({ photoNames, category }: { photoNames: string[]; category?: string }) {
   // One photo (or none: an icon for the kind of place) fills the card's width
   if (photoNames.length <= 1) {
@@ -303,11 +308,11 @@ function PhotoRow({ photoNames, category }: { photoNames: string[]; category?: s
       initialNumToRender={3}
       windowSize={3}
       contentContainerClassName="gap-2"
-      renderItem={({ item }) => (
+      renderItem={({ item, index }) => (
         <PlacePhoto
           photoName={item}
           category={category}
-          width={480}
+          width={index === 0 ? 900 : 480}
           className="h-28 w-40 rounded-2xl"
         />
       )}

@@ -33,7 +33,8 @@ export type SuggestedPlace = {
   name: string;
   coordinates: Coordinates;
   address?: string;
-  // The main photo (pins and cards), and a few more for the map's pop-up and the details sheet
+  // The main photo (the places list's cards, and the map's pop-up and the details sheet until
+  // their own photos load), and a few more for the map's pop-up and the details sheet
   photoName?: string;
   photoNames: string[];
   category?: string;

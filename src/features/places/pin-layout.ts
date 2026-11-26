@@ -2,8 +2,8 @@ import type { Coordinates } from '@convex/schema';
 import type { Region } from 'react-native-maps';
 
 // How big a pin is drawn (see place-pin.tsx):
-//   full    = photo and name label, hanging above the spot
-//   compact = just the photo, hanging above the spot
+//   full    = icon and name label, hanging above the spot
+//   compact = just the icon, hanging above the spot
 //   mini    = a small coloured dot on the spot
 export type PinSize = 'full' | 'compact' | 'mini';
 
@@ -62,12 +62,12 @@ function mercatorY(latitude: number): number {
 
 // Decides how big each pin is drawn, so pins don't cover each other:
 // 1. Every pin takes at least a mini dot's space.
-// 2. The selected pin (the one whose pop-up is open) always gets its photo and name.
+// 2. The selected pin (the one whose pop-up is open) always gets its icon and name.
 // 3. Then in priority order (saved places first, then the most popular), each pin gets the
 //    biggest size that covers no other pin's dot and nothing given out before: a label if it
-//    fits, otherwise its photo, otherwise it stays a mini dot.
+//    fits, otherwise its icon, otherwise it stays a mini dot.
 // Only mini dots can overlap each other, where places really are next to each other. Zooming in
-// spreads pins apart on screen, so they grow back to photos and labels.
+// spreads pins apart on screen, so they grow back to icons and labels.
 //
 // `region` is what the map shows and `mapWidth` its width in dp; together they give how many
 // dp one degree of longitude takes on screen.

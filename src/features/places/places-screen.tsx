@@ -128,6 +128,16 @@ export function PlacesScreen() {
                   sections={sections}
                   keyExtractor={(row) => row.key}
                   stickySectionHeadersEnabled={false}
+                  // Every card on the list asks for its photo, and each one is a paid Google
+                  // request, so only the cards near the screen are on it: what's shown plus 2
+                  // screens' worth above and below (windowSize 5, counted in screens; the
+                  // default 21 put every card of a 30-place search on the list as soon as the tab
+                  // opened). Those 2 screens ahead (about 5 cards) are why photos are already
+                  // there when someone scrolls at a reading pace: each card starts loading well
+                  // before it scrolls into view. The first render covers the first screen (the
+                  // section title counts as an item).
+                  initialNumToRender={4}
+                  windowSize={5}
                   contentContainerClassName="gap-3 px-4 pb-10"
                   ListHeaderComponent={
                     <View className="gap-3 pt-3">
