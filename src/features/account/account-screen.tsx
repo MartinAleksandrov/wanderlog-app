@@ -2,6 +2,7 @@ import { Card } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Text } from '@/components/ui/text';
 import { SignOutButton } from '@/features/auth';
+import { TravelSection } from '@/features/journal';
 import { useUser } from '@clerk/expo';
 import { api } from '@convex/_generated/api';
 import { useQuery } from 'convex/react';
@@ -9,8 +10,9 @@ import { Image } from 'expo-image';
 import { ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-// The fifth tab: who is signed in, and sign out. Name, email, photo and join date come from
-// Clerk (the account's owner); the app role and trip count come from our backend.
+// The fifth tab: who is signed in, where they've been (the globe and their past trips' journals,
+// see the journal feature), and sign out. Name, email, photo and join date come from Clerk (the
+// account's owner); the app role and trip count come from our backend.
 export function AccountScreen() {
   const { user } = useUser();
   const me = useQuery(api.users.me);
@@ -37,6 +39,8 @@ export function AccountScreen() {
               {email ? <Text variant="muted">{email}</Text> : null}
             </View>
           </View>
+
+          <TravelSection />
 
           <Card className="gap-0 py-0">
             <InfoRow

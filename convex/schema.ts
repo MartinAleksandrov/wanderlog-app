@@ -172,7 +172,13 @@ export default defineSchema({
     // time zone
     startDate: v.string(),
     endDate: v.string(),
+    // Planning notes (bookings, ideas, what to pack), from the edit-trip screen
     notes: v.optional(v.string()),
+    // The travel journal, written after the trip (or during it): how the city was overall.
+    // Separate from `notes`, which are for planning.
+    journal: v.optional(v.string()),
+    // The city's stars in the journal, 1 to 5
+    rating: v.optional(v.number()),
   }),
 
   // Who can open which trip, and with what role. The only place access is stored (the owner
@@ -205,7 +211,9 @@ export default defineSchema({
     kind: v.optional(placeKind),
     // The place's ID at the place-search provider (e.g. Google Places), to load more details
     providerPlaceId: v.optional(v.string()),
+    // The travel journal's note about this place, and its stars (1 to 5)
     notes: v.optional(v.string()),
+    rating: v.optional(v.number()),
   }).index('by_trip', ['tripId']),
 
   // The day-by-day plan. Each item is either a saved place or a free-text note; `kind` says
