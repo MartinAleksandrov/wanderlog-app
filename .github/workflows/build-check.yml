@@ -5,6 +5,19 @@ name: Build check
 on:
   pull_request:
     branches: [main]
+    # Only PRs that can change the native build: dependencies, app config, config plugins,
+    # Metro config, and the images and videos prebuild copies. JS-only PRs skip it, so this
+    # can't be a required check (a skipped required check never reports and blocks the merge).
+    paths:
+      - package.json
+      - pnpm-lock.yaml
+      - pnpm-workspace.yaml
+      - app.json
+      - app.config.ts
+      - plugins/**
+      - metro.config.js
+      - assets/**
+      - .github/workflows/build-check.yml
 
 # A new push to the same branch cancels the run that is still going
 concurrency:
@@ -17,7 +30,6 @@ permissions:
 
 jobs:
   android-build:
-    # This name becomes a status check, so keep it stable if you make it required
     name: android-build
     runs-on: ubuntu-latest
     timeout-minutes: 40
