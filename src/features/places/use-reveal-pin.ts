@@ -29,22 +29,29 @@ export function useRevealPin(mapRef: RefObject<MapView | null>) {
   async function reveal(coordinates: Coordinates) {
     const map = mapRef.current;
     if (map === null || size.height === 0) return;
-    // Where the pin's tip is on screen, in dp from the map's top left
-    const point = await map.pointForCoordinate(coordinates);
-    const freeBottom = size.height - CARD_COVER;
-    if (point.y < freeBottom - MARGIN) return;
-    // The middle of the free strip, a little lower because the label stands above the tip
-    const target = Math.min(
-      topCover + Math.max(freeBottom - topCover, 0) / 2 + PIN_HEIGHT / 2,
-      freeBottom - MARGIN,
-    );
-    // Moving the map's centre by the same distance moves the pin there
-    const center = await map.coordinateForPoint({
-      x: size.width / 2,
-      y: size.height / 2 + (point.y - target),
-    });
-    isRevealing.current = true;
-    map.animateCamera({ center }, { duration: 350 });
+    // The map refuses to convert points while it's still loading, or while another trip's map
+    // replaces it. The pin then simply stays where it is: the pop-up still opens, and nothing is
+    // left as an unhandled error.
+    try {
+      // Where the pin's tip is on screen, in dp from the map's top left
+      const point = await map.pointForCoordinate(coordinates);
+      const freeBottom = size.height - CARD_COVER;
+      if (point.y < freeBottom - MARGIN) return;
+      // The middle of the free strip, a little lower because the label stands above the tip
+      const target = Math.min(
+        topCover + Math.max(freeBottom - topCover, 0) / 2 + PIN_HEIGHT / 2,
+        freeBottom - MARGIN,
+      );
+      // Moving the map's centre by the same distance moves the pin there
+      const center = await map.coordinateForPoint({
+        x: size.width / 2,
+        y: size.height / 2 + (point.y - target),
+      });
+      isRevealing.current = true;
+      map.animateCamera({ center }, { duration: 350 });
+    } catch {
+      isRevealing.current = false;
+    }
   }
 
   return {

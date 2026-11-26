@@ -4,15 +4,16 @@ import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { showError } from '@/lib/error-message';
 import { api } from '@convex/_generated/api';
-import { TRIP_NAME_MAX_LENGTH, TRIP_NOTES_MAX_LENGTH } from '@convex/lib/limits';
+import { TRIP_MAX_DAYS, TRIP_NAME_MAX_LENGTH, TRIP_NOTES_MAX_LENGTH } from '@convex/lib/limits';
 import { useMutation, useQuery } from 'convex/react';
 import type { FunctionReturnType } from 'convex/server';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { CheckIcon } from 'lucide-react-native';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, View } from 'react-native';
-import { DateField } from '@/components/date-field';
-import { addDays, daysBetween, formatDate } from '@/lib/dates';
+import { TripDatesField } from './components/trip-dates-field';
+import { daysBetween, formatDate } from '@/lib/dates';
+import type { TripDates } from './trip-days';
 
 type Trip = NonNullable<FunctionReturnType<typeof api.trips.get>>;
 type Stop = FunctionReturnType<typeof api.itinerary.listForTrip>[number];
@@ -48,21 +49,20 @@ function Message({ text }: { text: string }) {
 function EditTripForm({ initialTrip, stops }: { initialTrip: Trip; stops: Stop[] }) {
   const router = useRouter();
   const [name, setName] = useState(initialTrip.name);
-  const [startDate, setStartDate] = useState(initialTrip.startDate);
-  const [endDate, setEndDate] = useState(initialTrip.endDate);
+  const [dates, setDates] = useState<TripDates>({
+    startDate: initialTrip.startDate,
+    endDate: initialTrip.endDate,
+  });
   const [notes, setNotes] = useState(initialTrip.notes ?? '');
   const [isSaving, setIsSaving] = useState(false);
   const updateTrip = useMutation(api.trips.update);
 
+  const { startDate, endDate } = dates;
   const days = daysBetween(startDate, endDate) + 1;
   // Stops on days the new dates no longer have; the backend moves them to the last day
   const cutStops = stops.filter((stop) => stop.day > days).length;
-
-  // A start past the end means the trip is pushed back: the end moves along, keeping its length
-  function changeStartDate(date: string) {
-    setStartDate(date);
-    if (endDate < date) setEndDate(addDays(date, days - 1));
-  }
+  // Only a trip saved before the length limit can be longer; the dates field says so
+  const isTooLong = days > TRIP_MAX_DAYS;
 
   // A promise chain, not try/finally: React Compiler can't compile a `finally` block yet
   function save() {
@@ -100,13 +100,7 @@ function EditTripForm({ initialTrip, stops }: { initialTrip: Trip; stops: Stop[]
         <Input value={name} onChangeText={setName} maxLength={TRIP_NAME_MAX_LENGTH} />
       </View>
 
-      <View className="gap-2">
-        <View className="flex-row gap-3">
-          <DateField label="Start" value={startDate} onChange={changeStartDate} />
-          <DateField label="End" value={endDate} minimumDate={startDate} onChange={setEndDate} />
-        </View>
-        <Text variant="muted">{days === 1 ? '1 day' : `${days} days`}</Text>
-      </View>
+      <TripDatesField value={dates} onChange={setDates} />
 
       <View className="gap-2">
         <Text className="text-sm font-medium">Notes</Text>
@@ -122,7 +116,11 @@ function EditTripForm({ initialTrip, stops }: { initialTrip: Trip; stops: Stop[]
         />
       </View>
 
-      <Button size="lg" disabled={name.trim() === '' || isSaving} onPress={confirmSave}>
+      <Button
+        size="lg"
+        disabled={name.trim() === '' || isTooLong || isSaving}
+        onPress={confirmSave}
+      >
         {isSaving ? <ActivityIndicator /> : <Icon as={CheckIcon} />}
         <Text>Save</Text>
       </Button>

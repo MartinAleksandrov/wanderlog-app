@@ -128,7 +128,7 @@ function SaveButton({
 // "Museum · ★ 4.5 (3,721)"
 function KindAndRating({ place }: { place: PlaceInfo }) {
   const rating = place.rating
-    ? `★ ${place.rating}${place.ratingCount ? ` (${place.ratingCount.toLocaleString()})` : ''}`
+    ? `★ ${place.rating.toFixed(1)}${place.ratingCount ? ` (${place.ratingCount.toLocaleString()})` : ''}`
     : null;
   const text = [place.category, rating].filter(Boolean).join(' · ');
   if (!text) return null;

@@ -26,6 +26,11 @@ import { usePlaceActions } from './use-place-actions';
 // (a form sheet route, src/app/place/[placeId].tsx): photos, rating, opening hours, contact
 // details and reviews, plus saving it or getting directions. Scrolls when it's taller than the
 // sheet.
+//
+// nestedScrollEnabled: the sheet is Android's bottom sheet, which lets a list inside it scroll
+// before the sheet moves only when the list says it takes part in nested scrolling. React
+// Native's ScrollView doesn't by default, so scrolling back up dragged the whole sheet down and
+// closed it.
 export function PlaceDetailsSheet() {
   const { placeId, name, photoName, kind } = useLocalSearchParams<PlaceDetailsParams>();
   const mode = PLACE_MODES[isPlaceKind(kind) ? kind : 'sight'];
@@ -39,7 +44,11 @@ export function PlaceDetailsSheet() {
   const place = details.data;
 
   return (
-    <ScrollView className="flex-1 bg-background" contentContainerClassName="gap-5 px-5 pt-3 pb-12">
+    <ScrollView
+      nestedScrollEnabled
+      className="flex-1 bg-background"
+      contentContainerClassName="gap-5 px-5 pt-3 pb-12"
+    >
       {/* A handle, so the sheet looks draggable (the native one is iOS only) */}
       <View className="h-1 w-10 self-center rounded-full bg-border" />
       <PhotoStrip

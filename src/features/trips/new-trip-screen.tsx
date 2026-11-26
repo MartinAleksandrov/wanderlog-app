@@ -10,9 +10,10 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MapPinIcon, PlaneTakeoffIcon } from 'lucide-react-native';
 import { useState } from 'react';
 import { ActivityIndicator, ScrollView, View } from 'react-native';
-import { DateField } from '@/components/date-field';
 import { DestinationResults } from './components/destination-results';
-import { addDays, daysBetween, todayIsoDate } from '@/lib/dates';
+import { TripDatesField } from './components/trip-dates-field';
+import { addDays, todayIsoDate } from '@/lib/dates';
+import type { TripDates } from './trip-days';
 
 // Optional route params: a city picked elsewhere (the map's search bar), so the pop-up opens
 // with it already chosen. All three come together.
@@ -29,17 +30,15 @@ export function NewTripScreen() {
       ? { placeId: params.placeId, name: params.name, region: params.region ?? '' }
       : null,
   );
-  const [startDate, setStartDate] = useState(todayIsoDate);
-  const [endDate, setEndDate] = useState(() => addDays(todayIsoDate(), 3));
+  // Four days from today to start with
+  const [dates, setDates] = useState<TripDates>(() => {
+    const today = todayIsoDate();
+    return { startDate: today, endDate: addDays(today, 3) };
+  });
   const [isCreating, setIsCreating] = useState(false);
 
   const getDestinationDetails = useAction(api.googlePlaces.destinationDetails);
   const createTrip = useMutation(api.trips.create);
-
-  function changeStartDate(date: string) {
-    setStartDate(date);
-    if (endDate < date) setEndDate(date);
-  }
 
   async function create() {
     if (destination === null) return;
@@ -50,8 +49,7 @@ export function NewTripScreen() {
         destination: [destination.name, destination.region].filter(Boolean).join(', '),
         destinationCoordinates: details.coordinates,
         destinationPhotoName: details.photoName,
-        startDate,
-        endDate,
+        ...dates,
       });
       // Closes this pop-up and switches to the map tab
       router.navigate('/map');
@@ -60,8 +58,6 @@ export function NewTripScreen() {
       setIsCreating(false);
     }
   }
-
-  const days = daysBetween(startDate, endDate) + 1;
 
   return (
     <ScrollView
@@ -97,13 +93,7 @@ export function NewTripScreen() {
         )}
       </View>
 
-      <View className="gap-2">
-        <View className="flex-row gap-3">
-          <DateField label="Start" value={startDate} onChange={changeStartDate} />
-          <DateField label="End" value={endDate} minimumDate={startDate} onChange={setEndDate} />
-        </View>
-        <Text variant="muted">{days === 1 ? '1 day' : `${days} days`}</Text>
-      </View>
+      <TripDatesField value={dates} onChange={setDates} />
 
       <Button size="lg" disabled={destination === null || isCreating} onPress={() => void create()}>
         {isCreating ? <ActivityIndicator /> : <Icon as={PlaneTakeoffIcon} />}

@@ -9,15 +9,18 @@ type DateFieldProps = {
   label: string;
   // 'YYYY-MM-DD'
   value: string;
+  // The first and last day the picker offers, 'YYYY-MM-DD'; it greys out the others
   minimumDate?: string;
+  maximumDate?: string;
   onChange: (value: string) => void;
 };
 
 // A labelled date input using the phone's own date picker. The picker works differently per
 // platform: Android opens it as a dialog from a function call, iOS shows a compact inline button.
-export function DateField({ label, value, minimumDate, onChange }: DateFieldProps) {
+export function DateField({ label, value, minimumDate, maximumDate, onChange }: DateFieldProps) {
   const date = fromIsoDate(value);
   const minimum = minimumDate ? fromIsoDate(minimumDate) : undefined;
+  const maximum = maximumDate ? fromIsoDate(maximumDate) : undefined;
 
   return (
     <View className="flex-1 gap-1.5">
@@ -28,6 +31,7 @@ export function DateField({ label, value, minimumDate, onChange }: DateFieldProp
           mode="date"
           display="compact"
           minimumDate={minimum}
+          maximumDate={maximum}
           onValueChange={(_event, picked) => onChange(toIsoDate(picked))}
           style={{ alignSelf: 'flex-start' }}
         />
@@ -40,6 +44,7 @@ export function DateField({ label, value, minimumDate, onChange }: DateFieldProp
               value: date,
               mode: 'date',
               minimumDate: minimum,
+              maximumDate: maximum,
               // Called only when the user picks a date (OK); Cancel just closes the dialog
               onValueChange: (_event, picked) => onChange(toIsoDate(picked)),
             })

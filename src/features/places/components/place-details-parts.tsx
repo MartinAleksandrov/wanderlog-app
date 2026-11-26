@@ -63,7 +63,7 @@ export function PlaceSummaryLine({ place }: { place: PlaceDetails }) {
       {place.rating ? (
         <Text className="text-sm font-medium">
           {/* The same solid star as the places list and the reviews */}
-          <Text className="text-sm text-orange-500">★</Text> {place.rating}
+          <Text className="text-sm text-orange-500">★</Text> {place.rating.toFixed(1)}
           {place.ratingCount ? (
             <Text variant="muted"> ({place.ratingCount.toLocaleString()})</Text>
           ) : null}
