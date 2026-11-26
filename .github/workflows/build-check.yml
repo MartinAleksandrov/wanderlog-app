@@ -1,0 +1,64 @@
+name: Build check
+
+# Builds a release APK the way EAS does (prebuild, then Gradle), so a broken native build shows
+# up on the PR instead of after a v* tag has spent an EAS build. Nothing is uploaded anywhere.
+on:
+  pull_request:
+    branches: [main]
+
+# A new push to the same branch cancels the run that is still going
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least privilege: the build only needs to read the code
+permissions:
+  contents: read
+
+jobs:
+  android-build:
+    # This name becomes a status check, so keep it stable if you make it required
+    name: android-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      HUSKY: 0 # no git hooks on CI machines
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # pnpm must exist before setup-node, so setup-node can cache pnpm's store
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # React Native 0.88's Gradle build targets Java 17
+      - name: Set up Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 17
+
+      # Caches Gradle's downloads and build outputs between runs
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      # android/ is gitignored: generate it from app.json, app.config.ts and the config plugins,
+      # the same step EAS runs before its Gradle build. No secrets: without the Maps key the
+      # build still succeeds (app.config.ts only warns), and the APK is never installed.
+      - name: Generate the native Android project
+        run: pnpm exec expo prebuild --platform android --no-install
+
+      # assembleRelease is the same build type as the EAS preview APK (R8 + bundled JS).
+      # One CPU architecture proves it builds and cuts the native C++ compile time by ~4x.
+      - name: Build release APK
+        working-directory: android
+        run: ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a
