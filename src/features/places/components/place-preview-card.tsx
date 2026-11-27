@@ -27,7 +27,16 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import Animated, { FadeInDown, FadeOutDown, LayoutAnimationConfig } from 'react-native-reanimated';
+import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
+import Animated, {
+  FadeInDown,
+  FadeOutDown,
+  LayoutAnimationConfig,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 import { openStatus } from '../open-status';
 import { placeDetailsHref } from '../place-details-href';
 import type { PlaceMode } from '../place-modes';
@@ -51,6 +60,11 @@ type PlacePreviewCardProps = {
   onClose: () => void;
 };
 
+// Swiping the pop-up down closes it when the finger lifts this far down (in dp), or moving down
+// this fast (dp per second, a flick). Otherwise it springs back.
+const CLOSE_DISTANCE = 80;
+const CLOSE_VELOCITY = 800;
+
 // The pop-up at the bottom of the map for the tapped pin: the place's photos (swipe for more),
 // rating, how far away it is (in the city), Google's short description, and the buttons:
 // - the main one: save a suggestion ("Add to trip" / "Save sweet spot" / "Save restaurant"),
@@ -59,7 +73,8 @@ type PlacePreviewCardProps = {
 // - Details: the full sheet with hours, contact details and reviews
 //
 // It floats a little above the bottom edge so Google's logo (bottom left) stays visible, which
-// Google requires. Android's back button closes it before leaving the screen.
+// Google requires. Swiping it down closes it, and so does Android's back button (before leaving
+// the screen).
 export function PlacePreviewCard({
   pin,
   mode,
@@ -77,6 +92,7 @@ export function PlacePreviewCard({
   // Until Google's photos are known, the pin's own photo
   const fallbackPhotos = pin.photoName ? [pin.photoName] : [];
   const photoNames = place?.photoNames.length ? place.photoNames : fallbackPhotos;
+  const swipe = useSwipeDownToClose(onClose);
 
   useFocusEffect(
     useCallback(() => {
@@ -103,71 +119,109 @@ export function PlacePreviewCard({
       exiting={FadeOutDown.duration(160)}
       style={styles.position}
     >
-      <View className={cn('gap-3 rounded-3xl border bg-background p-3 shadow-lg', mode.cardBorder)}>
-        <View className="flex-row items-start gap-2 pl-1">
-          <View className="flex-1 gap-1">
-            <Text className="text-lg leading-6 font-semibold" numberOfLines={2}>
-              {pin.name}
-            </Text>
-            <View className="flex-row flex-wrap items-center gap-x-2 gap-y-1">
-              <PlaceFacts
-                category={category}
-                place={place}
-                distance={distance}
-                isLoading={details.isLoading}
-              />
-              {/* Pops in when the place is saved here, not when an already-saved one opens */}
-              <LayoutAnimationConfig skipEntering>
-                {pin.saved ? <SavedTag mode={mode} /> : null}
-              </LayoutAnimationConfig>
+      {/* The card follows the finger down. Its own view, so the fade-out above (when it closes)
+          starts from where the finger left it. */}
+      <GestureDetector gesture={swipe.gesture}>
+        <Animated.View
+          style={swipe.style}
+          className={cn('gap-3 rounded-3xl border bg-background p-3 shadow-lg', mode.cardBorder)}
+        >
+          <View className="flex-row items-start gap-2 pl-1">
+            <View className="flex-1 gap-1">
+              <Text className="text-lg leading-6 font-semibold" numberOfLines={2}>
+                {pin.name}
+              </Text>
+              <View className="flex-row flex-wrap items-center gap-x-2 gap-y-1">
+                <PlaceFacts
+                  category={category}
+                  place={place}
+                  distance={distance}
+                  isLoading={details.isLoading}
+                />
+                {/* Pops in when the place is saved here, not when an already-saved one opens */}
+                <LayoutAnimationConfig skipEntering>
+                  {pin.saved ? <SavedTag mode={mode} /> : null}
+                </LayoutAnimationConfig>
+              </View>
             </View>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="-mt-1 -mr-1 rounded-full"
+              aria-label="Close"
+              onPress={onClose}
+            >
+              <Icon as={XIcon} className="text-muted-foreground" />
+            </Button>
           </View>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="-mt-1 -mr-1 rounded-full"
-            aria-label="Close"
-            onPress={onClose}
-          >
-            <Icon as={XIcon} className="text-muted-foreground" />
-          </Button>
-        </View>
 
-        <PhotoRow photoNames={photoNames} category={category} />
+          <PhotoRow photoNames={photoNames} category={category} />
 
-        {place?.summary ? (
-          <Text className="px-1 text-sm leading-5 text-muted-foreground" numberOfLines={2}>
-            {place.summary}
-          </Text>
-        ) : null}
-        {details.error ? (
-          <Pressable onPress={() => void details.refetch()} className="px-1">
-            <Text className="text-sm text-destructive">
-              {errorMessage(details.error)} <Text className="text-sm font-semibold">Retry</Text>
+          {place?.summary ? (
+            <Text className="px-1 text-sm leading-5 text-muted-foreground" numberOfLines={2}>
+              {place.summary}
             </Text>
-          </Pressable>
-        ) : null}
+          ) : null}
+          {details.error ? (
+            <Pressable onPress={() => void details.refetch()} className="px-1">
+              <Text className="text-sm text-destructive">
+                {errorMessage(details.error)} <Text className="text-sm font-semibold">Retry</Text>
+              </Text>
+            </Pressable>
+          ) : null}
 
-        <View className="flex-row gap-2">
-          <MainAction
-            pin={pin}
-            mode={mode}
-            exploringCity={exploringCity}
-            onAdd={onAdd}
-            onRemove={onRemove}
-            onPlanTrip={onPlanTrip}
-          />
-          <DirectionsButton
-            destination={{ name: pin.name, coordinates: pin.coordinates, providerPlaceId: placeId }}
-          />
-          <Button variant="outline" disabled={placeId === undefined} onPress={openDetails}>
-            <Text>Details</Text>
-            <Icon as={ChevronRightIcon} className="size-4" />
-          </Button>
-        </View>
-      </View>
+          <View className="flex-row gap-2">
+            <MainAction
+              pin={pin}
+              mode={mode}
+              exploringCity={exploringCity}
+              onAdd={onAdd}
+              onRemove={onRemove}
+              onPlanTrip={onPlanTrip}
+            />
+            <DirectionsButton
+              destination={{
+                name: pin.name,
+                coordinates: pin.coordinates,
+                providerPlaceId: placeId,
+              }}
+            />
+            <Button variant="outline" disabled={placeId === undefined} onPress={openDetails}>
+              <Text>Details</Text>
+              <Icon as={ChevronRightIcon} className="size-4" />
+            </Button>
+          </View>
+        </Animated.View>
+      </GestureDetector>
     </Animated.View>
   );
+}
+
+// Swipe down to close. The gesture starts only once the finger has moved 10 dp down. It gives up
+// when the finger moves 12 dp sideways first, so swiping through the photos still works, and taps
+// on the buttons never move far enough to start it. The card's position is a shared value moved
+// on the UI thread (Gesture Handler's default when Reanimated is installed), so it keeps up with
+// the finger without a round trip to JavaScript. Only closing goes to the JS thread
+// (scheduleOnRN), since it changes React state.
+function useSwipeDownToClose(onClose: () => void) {
+  const offset = useSharedValue(0);
+  const gesture = usePanGesture({
+    activeOffsetY: 10,
+    failOffsetX: [-12, 12],
+    onUpdate: (event) => {
+      'worklet';
+      // Down only: dragging up keeps the card where it is
+      offset.value = Math.max(0, event.translationY);
+    },
+    onDeactivate: (event) => {
+      'worklet';
+      const isFarOrFast = event.translationY > CLOSE_DISTANCE || event.velocityY > CLOSE_VELOCITY;
+      if (!event.canceled && isFarOrFast) scheduleOnRN(onClose);
+      else offset.value = withSpring(0);
+    },
+  });
+  const style = useAnimatedStyle(() => ({ transform: [{ translateY: offset.value }] }));
+  return { gesture, style };
 }
 
 // What Google says about the pin's place. A suggestion already has it all (rating, description,
