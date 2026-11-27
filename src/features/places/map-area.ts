@@ -15,8 +15,19 @@ const CITY_WIDTH_METERS = 5000;
 // Fixed rather than measured, so the city's first search (and its cached answer) stays the same
 // when the window changes size (split screen, a foldable).
 const MAP_HEIGHT_PER_WIDTH = 2;
+// How wide the map shows a single place picked in the search bar: its street and a few around it
+const PLACE_WIDTH_METERS = 1200;
 // Fewer places than this and the screens offer a wider search
 export const FEW_PLACES = 5;
+
+// The map region around a single place picked in the search bar, with the place in the middle
+export function placeRegion(center: Coordinates): Region {
+  return areaToRegion({
+    center,
+    widthMeters: PLACE_WIDTH_METERS,
+    heightMeters: PLACE_WIDTH_METERS * MAP_HEIGHT_PER_WIDTH,
+  });
+}
 
 // A city's first search area, the shape of the map, so its places cover the whole map when it
 // opens there

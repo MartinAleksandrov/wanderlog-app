@@ -54,7 +54,9 @@ type PlacePreviewCardProps = {
   // Set while exploring another city: its places can't join the current trip, so the main
   // button offers to plan a trip there instead
   exploringCity?: string;
-  onAdd: () => void;
+  // Missing when there's no trip to save to (a place found with the search bar before the first
+  // trip): the card then has no main button
+  onAdd?: () => void;
   onRemove: () => void;
   onPlanTrip: () => void;
   onClose: () => void;
@@ -240,7 +242,7 @@ function usePinPlace(pin: Pin) {
 }
 
 // The card's main button: remove a saved place, plan a trip to an explored city, or save a
-// suggestion (in the suggestion pins' colour)
+// suggestion (in the suggestion pins' colour). None without a trip to save to.
 function MainAction({
   pin,
   mode,
@@ -269,6 +271,7 @@ function MainAction({
       </Button>
     );
   }
+  if (onAdd === undefined) return null;
   return (
     <Button
       className={cn('flex-1', mode.addButton)}
