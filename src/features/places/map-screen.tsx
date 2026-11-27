@@ -52,7 +52,6 @@ export function MapScreen() {
   const { trip, explore, initialRegion, pins, selectedKey, selected, select } = places;
   const revealPin = useRevealPin(mapRef);
   const route = useMapRoute(mapRef, () => select(null));
-  const location = useMyLocation();
   const locateMe = useLocateMe(mapRef);
   const distanceTo = useDistanceTo(places.shownArea);
   // What the map shows right now, updated when it stops moving (sizes the pins)
@@ -99,8 +98,9 @@ export function MapScreen() {
         toolbarEnabled={false}
         // Google's blue "you are here" dot, once the location is allowed (places tab, "Turn on",
         // or the locate button). Google's own locate button would sit under the search bar, so
-        // the map has its own at the bottom right, which needs to know where the dot is.
-        showsUserLocation={location.access === 'granted'}
+        // the map has its own at the bottom right, which needs to know where the dot is. It also
+        // restarts the dot after finding you (see restartDot in use-locate-me.ts).
+        showsUserLocation={locateMe.showsDot}
         showsMyLocationButton={false}
         onUserLocationChange={locateMe.onUserLocationChange}
         // Sweet spots get a warm cream map without Google's own shop icons
