@@ -10,7 +10,7 @@ import type { Doc } from '@convex/_generated/dataModel';
 import type { SuggestedPlace } from '@convex/googlePlaces';
 import type { PlaceKind } from '@convex/schema';
 import { useRouter } from 'expo-router';
-import { ExpandIcon, NavigationIcon } from 'lucide-react-native';
+import { ExpandIcon } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -30,11 +30,13 @@ import type { CrawlSpot } from './crawl';
 import { LocationPrompt } from './components/location-prompt';
 import { ModeSwitch } from './components/mode-switch';
 import { PlaceCard, type PlaceInfo } from './components/place-card';
+import { SortChips, SortNote } from './components/sort-chips';
 import { isOpen, openStatus, type OpenStatus } from './open-status';
 import { placeDetailsHref } from './place-details-href';
 import { passesFilters } from './place-filters';
 import { usePlaceMode } from './place-mode-context';
 import type { PlaceMode } from './place-modes';
+import { sortPlaces, type PlaceSort } from './place-ranking';
 import { FEW_PLACES, widerSearchArea } from './map-area';
 import { sideAfterSwipe, stepBetween } from './side-swipe';
 import { useTripPlaces } from './trip-places';
@@ -60,11 +62,12 @@ const BACK_TO_TOP_AFTER = 600;
 
 // The third tab: the same places as the map, as a list with photos and details, for the side
 // switched on at the top (sights, sweet spots or restaurants) and the filters picked (kind and
-// "Open now", shared with the map). Saved ones first, then the suggestions that aren't saved
-// yet. In the city, each card says how far away it is and both lists go closest first;
-// otherwise Google's order (most popular first). Swiping left or right on the list switches to
-// the next or previous side, like pages; the switch stays above the list. Once scrolled down, a
-// button at the bottom right goes back to the top.
+// "Open now", shared with the map). Saved ones first, then the 30 suggestions that aren't saved
+// yet. Both lists go top rated first (the one more people rated breaks a tie), or most reviewed
+// first, or (in the city) closest first, picked with the sort chips; the pick stays when
+// switching sides. In the city, each card says how far away it is. Swiping left or right on the
+// list switches to the next or previous side, like pages; the switch stays above the list. Once
+// scrolled down, a button at the bottom right goes back to the top.
 export function PlacesScreen() {
   const router = useRouter();
   const { mode, setKind, filter, setFilterId, openNow, setOpenNow } = usePlaceMode();
@@ -77,6 +80,7 @@ export function PlacesScreen() {
   const slideStep = useSlideStep(mode.kind);
   const listRef = useRef<SectionList<Row>>(null);
   const backToTop = useBackToTop(mode.kind);
+  const [pickedSort, setSort] = useState<PlaceSort>('rating');
 
   // The pop-up with more details. Name and photo go along so its top shows at once, and the
   // side, so its button saves to the same list.
@@ -106,13 +110,17 @@ export function PlacesScreen() {
 
   const { savedRows, suggestedRows } = toRows(saved ?? [], suggestions.data ?? [], now);
   const filters = { filter, openNow };
-  // Closest first when distances are known; otherwise the backend's order (most reviewed first)
+  const isInCity = distanceTo !== null;
+  // Closest needs the distances: after leaving the city, top rated until it's back
+  const sort = pickedSort === 'distance' && !isInCity ? 'rating' : pickedSort;
+  // The filtered places in the picked order, with their distances when in the city
   const inOrder = (rows: Row[]) => {
     const shown = rows.filter((row) => passesFilters(row, filters));
-    if (distanceTo === null) return shown;
-    return shown
-      .map((row) => ({ ...row, distance: distanceTo(row.info.coordinates) }))
-      .sort((a, b) => a.distance - b.distance);
+    const measured =
+      distanceTo === null
+        ? shown
+        : shown.map((row) => ({ ...row, distance: distanceTo(row.info.coordinates) }));
+    return sortPlaces(measured, sort);
   };
   const savedShown = inOrder(savedRows);
   const sections = [
@@ -120,7 +128,6 @@ export function PlacesScreen() {
     { title: mode.suggestedTitle, data: inOrder(suggestedRows) },
   ].filter((section) => section.data.length > 0);
   const widerArea = area ? widerSearchArea(area) : null;
-  const isInCity = distanceTo !== null;
 
   return (
     <View className="flex-1 bg-background">
@@ -174,6 +181,16 @@ export function PlacesScreen() {
                         className="-mx-4"
                         contentClassName="px-4 py-1"
                       />
+                      {savedRows.length + suggestedRows.length > 0 ? (
+                        <SortChips
+                          mode={mode}
+                          sort={sort}
+                          isInCity={isInCity}
+                          onChange={setSort}
+                          className="-mx-4"
+                          contentClassName="px-4 py-1"
+                        />
+                      ) : null}
                       <CrawlCard
                         mode={mode}
                         spots={crawlSpots(savedShown, isInCity)}
@@ -186,12 +203,7 @@ export function PlacesScreen() {
                       <Text className="text-sm font-semibold text-muted-foreground uppercase">
                         {section.title}
                       </Text>
-                      {distanceTo ? (
-                        <View className="flex-row items-center gap-1">
-                          <Icon as={NavigationIcon} className="size-3 text-blue-600" />
-                          <Text className="text-xs font-medium text-blue-600">Closest first</Text>
-                        </View>
-                      ) : null}
+                      <SortNote sort={sort} />
                     </View>
                   )}
                   renderItem={({ item }) => (
