@@ -21,7 +21,12 @@ export function distanceMeters(a: Coordinates, b: Coordinates): number {
 // A rough walk between two points, for the plan: "~8 min · 650 m". Rough on purpose; Google
 // Maps gives the exact route when the user taps Directions.
 export function walkEstimate(a: Coordinates, b: Coordinates): { meters: number; minutes: number } {
-  const meters = distanceMeters(a, b) * DETOUR;
+  return walkFromStraightLine(distanceMeters(a, b));
+}
+
+// The same rough walk from a straight-line distance already worked out, e.g. "350 m away"
+export function walkFromStraightLine(straightMeters: number): { meters: number; minutes: number } {
+  const meters = straightMeters * DETOUR;
   return { meters, minutes: Math.max(1, Math.round(meters / WALK_M_PER_MIN)) };
 }
 
@@ -36,9 +41,10 @@ export function routeWalkEstimate(points: Coordinates[]): { meters: number; minu
   return { meters, minutes: Math.round(meters / WALK_M_PER_MIN) };
 }
 
-// "650 m", "3.2 km"
+// "650 m", "3.2 km". Rounded before the unit is picked, so 996 m is "1.0 km", not "1000 m".
 export function formatDistance(meters: number): string {
-  return meters < 1000 ? `${Math.round(meters / 10) * 10} m` : `${(meters / 1000).toFixed(1)} km`;
+  const rounded = Math.round(meters / 10) * 10;
+  return rounded < 1000 ? `${rounded} m` : `${(meters / 1000).toFixed(1)} km`;
 }
 
 // "8 min", "1 h 25 min"

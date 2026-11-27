@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { DirectionsButton } from '@/features/places';
-import { distanceMeters, formatDistance } from '@/lib/geo';
+import { distanceMeters, formatDistance, formatMinutes, walkFromStraightLine } from '@/lib/geo';
 import { useMyLocation } from '@/lib/my-location';
 import { CheckIcon, PartyPopperIcon } from 'lucide-react-native';
 import { View } from 'react-native';
@@ -11,6 +11,10 @@ import type { Stop } from '../use-itinerary';
 
 // Further than this, the phone isn't in the trip's city (yet): no "away" line
 const NEAR_METERS = 50_000;
+// Closer than this, you're there: the phone's location is only good to a few dozen metres
+const HERE_METERS = 50;
+// Longer than this, nobody walks it: just how far, without the minutes
+const MAX_WALK_MINUTES = 60;
 
 // Today's plan at a glance, for when you're out walking: the first stop not ticked off yet and
 // how far away it is, with big Directions and "Been there" buttons. "Been there" ticks it off
@@ -59,7 +63,7 @@ export function NextStopCard({
           {place.category ? <Text variant="muted">{place.category}</Text> : null}
           {away !== null && away < NEAR_METERS ? (
             <Text className="text-sm font-semibold text-blue-700 dark:text-blue-300">
-              {formatDistance(away)} away
+              {walkLine(away)}
             </Text>
           ) : null}
         </View>
@@ -82,4 +86,16 @@ export function NextStopCard({
       </View>
     </View>
   );
+}
+
+// How far the stop is from the phone, given the straight line: "~11 min walk · 850 m". A rough
+// walk (the straight line plus a quarter for the streets), like the walks between the plan's
+// stops, so it's close to what Google Maps shows after Directions; the straight line alone is
+// about a quarter shorter than any real walk.
+function walkLine(away: number): string {
+  if (away < HERE_METERS) return "You're here";
+  const walk = walkFromStraightLine(away);
+  // The same walked distance as below, so the number never drops while walking away
+  if (walk.minutes > MAX_WALK_MINUTES) return `~${formatDistance(walk.meters)} away`;
+  return `~${formatMinutes(walk.minutes)} walk · ${formatDistance(walk.meters)}`;
 }
