@@ -5,6 +5,7 @@ import type { OptimisticLocalStore, OptimisticUpdate } from 'convex/browser';
 import { useMutation, useQuery } from 'convex/react';
 import type { FunctionArgs, FunctionReturnType } from 'convex/server';
 import * as Haptics from 'expo-haptics';
+import { insertAt } from './reorder';
 
 // One planned stop: its place in the plan (day, order, done) plus the saved place itself
 export type Stop = FunctionReturnType<typeof api.itinerary.listForTrip>[number];
@@ -78,6 +79,25 @@ const moveOptimistically: OptimisticUpdate<FunctionArgs<typeof api.itinerary.mov
       .sort(byDayAndOrder);
   });
 
+const moveToOptimistically: OptimisticUpdate<FunctionArgs<typeof api.itinerary.moveItemTo>> = (
+  store,
+  { itemId, beforeItemId },
+) =>
+  updatePlans(store, (stops) => {
+    const item = stops.find((stop) => stop._id === itemId);
+    if (item === undefined) return stops;
+    const others = stops.filter((stop) => stop.day === item.day && stop._id !== itemId);
+    const found = others.findIndex((stop) => stop._id === beforeItemId);
+    const reordered = insertAt(others, item, found === -1 ? others.length : found);
+    const orderById = new Map(reordered.map((stop, position) => [stop._id, position + 1]));
+    return stops
+      .map((stop) => {
+        const order = orderById.get(stop._id);
+        return order === undefined ? stop : { ...stop, order };
+      })
+      .sort(byDayAndOrder);
+  });
+
 const doneOptimistically: OptimisticUpdate<FunctionArgs<typeof api.itinerary.setDone>> = (
   store,
   { itemId, done },
@@ -87,18 +107,21 @@ const doneOptimistically: OptimisticUpdate<FunctionArgs<typeof api.itinerary.set
   );
 
 // A stop added a moment ago that the server hasn't confirmed yet has no real ID to change
-function isPending(stop: Stop): boolean {
+export function isPending(stop: Stop): boolean {
   return stop._id.startsWith('optimistic-');
 }
 
-// Changing the plan: add a saved place to a day, take a stop off, move it up or down, tick it
-// off. Ticking off a stop gives a little "done" buzz.
+// Changing the plan: add a saved place to a day, take a stop off, move it up or down or drop it
+// somewhere else in its day, tick it off. Ticking off a stop gives a little "done" buzz.
 export function useItineraryActions(tripId: Id<'trips'> | undefined) {
   const addPlace = useMutation(api.itinerary.addPlace).withOptimisticUpdate(addOptimistically);
   const removeItem = useMutation(api.itinerary.removeItem).withOptimisticUpdate(
     removeOptimistically,
   );
   const moveItem = useMutation(api.itinerary.moveItem).withOptimisticUpdate(moveOptimistically);
+  const moveItemTo = useMutation(api.itinerary.moveItemTo).withOptimisticUpdate(
+    moveToOptimistically,
+  );
   const setDone = useMutation(api.itinerary.setDone).withOptimisticUpdate(doneOptimistically);
 
   function add(placeId: Id<'places'>, day: number, name: string) {
@@ -122,6 +145,14 @@ export function useItineraryActions(tripId: Id<'trips'> | undefined) {
     );
   }
 
+  // Dropped right before `before`, or at the end of the day (null)
+  function moveTo(stop: Stop, before: Stop | null) {
+    if (isPending(stop) || (before !== null && isPending(before))) return;
+    void moveItemTo({ itemId: stop._id, beforeItemId: before?._id ?? null }).catch(
+      (error: unknown) => showError(`Couldn't move ${stop.place.name}`, error),
+    );
+  }
+
   function toggleDone(stop: Stop) {
     if (isPending(stop)) return;
     if (!stop.done) void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -130,5 +161,5 @@ export function useItineraryActions(tripId: Id<'trips'> | undefined) {
     );
   }
 
-  return { add, remove, move, toggleDone };
+  return { add, remove, move, moveTo, toggleDone };
 }
