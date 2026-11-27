@@ -22,3 +22,8 @@ export const BOOKING_NOTES_MAX_LENGTH = 2000;
 export const BOOKING_URL_MAX_LENGTH = 2000;
 // The highest price a booking can have, in cents: 1,000,000 in any currency
 export const BOOKING_PRICE_MAX_CENTS = 100_000_000;
+
+// The admin dashboard counts users, trips, places and the like by reading the rows: Convex keeps
+// no running counts. It reads at most this many per table, which keeps the dashboard's one query
+// well inside Convex's limit on rows read per query. At the limit the app shows "2,000+".
+export const ADMIN_COUNT_LIMIT = 2000;

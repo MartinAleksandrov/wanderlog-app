@@ -1,4 +1,6 @@
+import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Icon } from '@/components/ui/icon';
 import { Separator } from '@/components/ui/separator';
 import { Text } from '@/components/ui/text';
 import { SignOutButton } from '@/features/auth';
@@ -8,6 +10,8 @@ import { useUser } from '@clerk/expo';
 import { api } from '@convex/_generated/api';
 import { useQuery } from 'convex/react';
 import { Image } from 'expo-image';
+import { useRouter } from 'expo-router';
+import { LayoutDashboardIcon } from 'lucide-react-native';
 import { ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -17,6 +21,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 export function AccountScreen() {
   const { user } = useUser();
   const me = useQuery(api.users.me);
+  const router = useRouter();
 
   const email = user?.primaryEmailAddress?.emailAddress;
   const name = user?.fullName || email?.split('@')[0] || 'Traveller';
@@ -63,6 +68,15 @@ export function AccountScreen() {
               }
             />
           </Card>
+
+          {/* Admins only: the role comes from our backend, which also refuses the dashboard's
+            data to anyone else */}
+          {me?.role === 'admin' ? (
+            <Button variant="outline" onPress={() => router.push('/admin')}>
+              <Icon as={LayoutDashboardIcon} />
+              <Text>Admin dashboard</Text>
+            </Button>
+          ) : null}
 
           <SignOutButton />
         </ScrollView>

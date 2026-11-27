@@ -1,6 +1,7 @@
 import '@/global.css';
 
-import { SignOutButton, SigningInScreen } from '@/features/auth';
+import { SignOutButton, SigningInScreen, SuspendedScreen } from '@/features/auth';
+import { DEVICE_INFO } from '@/lib/device-info';
 import { env } from '@/lib/env';
 import { installGlobalErrorHandler, reportError } from '@/lib/error-reporting';
 import { NAV_THEME } from '@/lib/theme';
@@ -9,7 +10,7 @@ import { tokenCache } from '@clerk/expo/token-cache';
 import { api } from '@convex/_generated/api';
 import { PortalHost } from '@rn-primitives/portal';
 import { QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ConvexReactClient, useConvexAuth, useMutation } from 'convex/react';
+import { ConvexReactClient, useConvexAuth, useMutation, useQuery } from 'convex/react';
 import { ConvexProviderWithClerk } from 'convex/react-clerk';
 import { ConvexError } from 'convex/values';
 import { Stack } from 'expo-router';
@@ -17,7 +18,7 @@ import { ThemeProvider } from 'expo-router/react-navigation';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { LogBox } from 'react-native';
+import { AppState, LogBox } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useUniwind } from 'uniwind';
 
@@ -125,16 +126,30 @@ function RootNavigator() {
   // so the token refresh failed), the user didn't just sign in, and the guards handle it as before.
   const finishingSignIn = isSignedIn === true && !isAuthenticated && !hadConvexAuth;
 
+  // Suspended by an admin: the whole app is covered by the "Your account was suspended" screen.
+  // A live query, so it appears the moment the admin suspends the account, even mid-use, and goes
+  // away the moment they restore it. null while signed out.
+  const me = useQuery(api.users.me);
+  const suspended = isAuthenticated && me?.suspended === true;
+
   useEffect(() => {
     if (!isLoading) void SplashScreen.hideAsync();
   }, [isLoading]);
 
   // After every sign-in, make sure the backend has this person's users row, so trips can point
-  // to it. Mutations create the row too if it's missing, so a failure here isn't fatal.
+  // to it, and note which phone they're on (the admin dashboard's "last seen" and devices).
+  // Again each time the app comes back to the foreground: Android keeps the app running in the
+  // background for days, so a start alone would miss most visits. Mutations create the row too
+  // if it's missing, so a failure here isn't fatal.
   useEffect(() => {
-    if (isAuthenticated) {
-      storeUser().catch((error: unknown) => reportError(error, 'action'));
-    }
+    if (!isAuthenticated) return;
+    const store = () =>
+      storeUser({ device: DEVICE_INFO }).catch((error: unknown) => reportError(error, 'action'));
+    void store();
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void store();
+    });
+    return () => subscription.remove();
   }, [isAuthenticated, storeUser]);
 
   return (
@@ -157,6 +172,11 @@ function RootNavigator() {
           />
           {/* A past trip's journal; the screen sets the trip's name as its title */}
           <Stack.Screen name="journal/[tripId]" options={{ headerShown: true, title: 'Journal' }} />
+          {/* The admin dashboard, from the account tab. Not hidden from other users here: the
+            backend sends its data to admins only, and the screen says so to anyone else. */}
+          <Stack.Screen name="admin" options={{ headerShown: true, title: 'Dashboard' }} />
+          {/* One user's page; the screen sets the person's name as its title */}
+          <Stack.Screen name="admin/user/[userId]" options={{ headerShown: true, title: 'User' }} />
           {/* The form sets its own title ("Add a stay", "Edit flight") */}
           <Stack.Screen
             name="trip/[tripId]/booking"
@@ -192,6 +212,7 @@ function RootNavigator() {
       {/* Sign out: if Convex never accepts the token (a broken Clerk JWT template, say), Clerk
           stays signed in, and signing out is the only way back to a working sign-in form */}
       {finishingSignIn ? <SigningInScreen slowAction={<SignOutButton />} /> : null}
+      {suspended ? <SuspendedScreen /> : null}
     </>
   );
 }

@@ -4,9 +4,9 @@ import { v, type Infer } from 'convex/values';
 // Wandr's data for the first release. How the tables relate:
 //
 //   users ──< tripMembers >── trips ──< places
-//                               │         ▲ (place items point to a place)
-//                               ├──< itineraryItems
-//                               └──< bookings (hotels, flights, transport, activities)
+//     │                         │         ▲ (place items point to a place)
+//     ├──< devices              ├──< itineraryItems
+//     └──< googleRequests       └──< bookings (hotels, flights, transport, activities)
 //
 // "A ──< B" means one A has many Bs, and each B stores its A's ID (v.id('a')).
 // Convex adds _id and _creationTime to every document automatically.
@@ -28,9 +28,35 @@ export type PlaceKind = Infer<typeof placeKind>;
 
 // What a person may do in the whole app (separate from their role in any one trip). Functions
 // read the type from the table, e.g. Doc<'users'>['role'].
-//   admin: manage the app: review all data, delete users and their content
+//   admin: everything a user can, plus the dashboard (convex/admin.ts): every user's usage,
+//          and suspending users or deleting their data
 //   user:  a regular signed-in person; sees only trips they are a member of
 const appRole = v.union(v.literal('admin'), v.literal('user'));
+
+// The phone the app runs on, as the app reports it on each start (src/lib/device-info.ts).
+// Android: model 'SM-S921B', manufacturer 'samsung', osVersion 'Android 16'.
+export const deviceInfo = v.object({
+  platform: v.string(),
+  model: v.string(),
+  manufacturer: v.optional(v.string()),
+  osVersion: v.string(),
+  // Wandr's version, from app.config.ts
+  appVersion: v.optional(v.string()),
+});
+export type DeviceInfo = Infer<typeof deviceInfo>;
+
+// Which kind of Google Places request it was. Google bills each kind at its own price:
+//   autocomplete = search suggestions while typing (cities, stays, the map's search bar)
+//   details      = one place's details (a picked city or stay, the details sheet)
+//   nearby       = the places, sweet spots and restaurants around the map's area
+//   textSearch   = "places matching a word" from the map's search bar
+export const googleRequestKind = v.union(
+  v.literal('autocomplete'),
+  v.literal('details'),
+  v.literal('nearby'),
+  v.literal('textSearch'),
+);
+export type GoogleRequestKind = Infer<typeof googleRequestKind>;
 
 // What a member may do in a trip (see convex/lib/permissions.ts, which ranks them)
 //   owner:  everything, including deleting the trip and managing members
@@ -152,13 +178,47 @@ export default defineSchema({
     email: v.optional(v.string()),
     name: v.optional(v.string()),
     imageUrl: v.optional(v.string()),
-    // New users always start as 'user'. Only an existing admin (or a manual edit in the Convex
-    // dashboard) can make someone an admin; the app never sends a role for itself.
+    // New users always start as 'user'. Only a manual edit in the Convex dashboard (Data → users)
+    // makes someone an admin; the app never sends a role for itself.
     role: appRole,
     // The trip the map and places tabs show. Kept on the server, so it's the same on every
     // device. May point to a deleted trip; functions then fall back to the newest trip.
     activeTripId: v.optional(v.id('trips')),
+    // When an admin suspended the account. While set, every function treats the person as
+    // signed out (see convex/lib/permissions.ts) and the app shows "Your account was suspended".
+    // The row itself stays: deleted, it would be created again on the next sign-in.
+    suspendedAt: v.optional(v.number()),
+    // When an admin deleted the person's trips and devices (the account stays suspended)
+    dataDeletedAt: v.optional(v.number()),
+    // No "last seen" here: every query reads this row, so a change to it re-runs all of the
+    // user's live queries. Last seen is on their devices instead.
   }).index('by_clerk_user_id', ['clerkUserId']),
+
+  // The phones someone has used the app on. One row per user and phone model: an OS update or a
+  // reinstall updates the same row. Written by users.store on every app start and every return
+  // to the foreground; read only by the admin dashboard.
+  devices: defineTable({
+    userId: v.id('users'),
+    ...deviceInfo.fields,
+    lastSeenAt: v.number(),
+  })
+    // "This user's devices", and with the model: "this user's row for this phone"
+    .index('by_user_and_platform_and_model', ['userId', 'platform', 'model']),
+
+  // How many Google Places requests each user made, per day and kind. One row per user, day and
+  // kind with a running count rather than one row per request, so the table stays small.
+  // Counted in convex/googlePlaces.ts before each request goes out.
+  googleRequests: defineTable({
+    userId: v.id('users'),
+    // 'YYYY-MM-DD' in UTC
+    day: v.string(),
+    kind: googleRequestKind,
+    count: v.number(),
+  })
+    // One user's counts (by day), and the row to add one to
+    .index('by_user_and_day_and_kind', ['userId', 'day', 'kind'])
+    // Everyone's counts for the last few days (the dashboard's chart)
+    .index('by_day', ['day']),
 
   trips: defineTable({
     name: v.string(),
