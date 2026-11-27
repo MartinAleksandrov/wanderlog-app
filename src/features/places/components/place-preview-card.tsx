@@ -19,7 +19,7 @@ import {
   Trash2Icon,
   XIcon,
 } from 'lucide-react-native';
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import {
   ActivityIndicator,
   BackHandler,
@@ -27,15 +27,19 @@ import {
   Pressable,
   StyleSheet,
   View,
+  type LayoutChangeEvent,
 } from 'react-native';
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
 import Animated, {
+  clamp,
+  Easing,
   FadeInDown,
   FadeOutDown,
   LayoutAnimationConfig,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
+  withTiming,
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 import { openStatus } from '../open-status';
@@ -63,10 +67,21 @@ type PlacePreviewCardProps = {
   onClose: () => void;
 };
 
-// Swiping the pop-up down closes it when the finger lifts this far down (in dp), or moving down
-// this fast (dp per second, a flick). Otherwise it springs back.
+// A swipe down closes the pop-up when the card would come to rest at least this far below its
+// place (in dp), about a quarter of the card. Otherwise it springs back.
 const CLOSE_DISTANCE = 80;
-const CLOSE_VELOCITY = 800;
+// Where the card would come to rest: where the finger let go, plus this many seconds at the
+// finger's speed (iOS sheets decide the same way). So a short quick flick closes it, while a
+// short slow drag, or one that turns back up before letting go, springs back.
+const MOMENTUM_SECONDS = 0.2;
+// Pulled above its place, the card follows the finger only this much of the way, so it gives a
+// little, like a native sheet, instead of stopping dead
+const UP_RESISTANCE = 0.2;
+// How long the card takes to slide off the screen once let go (see slideDuration)
+const MIN_SLIDE_MS = 120;
+const MAX_SLIDE_MS = 280;
+// The gap under the card, which keeps Google's logo visible
+const CARD_BOTTOM = 40;
 
 // The pop-up at the bottom of the map for the tapped pin: the place's photos (swipe for more),
 // rating, how far away it is (in the city), Google's short description, and the buttons:
@@ -95,7 +110,7 @@ export function PlacePreviewCard({
   // Until Google's photos are known, the pin's own photo
   const fallbackPhotos = pin.photoName ? [pin.photoName] : [];
   const photoNames = place?.photoNames.length ? place.photoNames : fallbackPhotos;
-  const swipe = useSwipeDownToClose(onClose);
+  const swipe = useSwipeDownToClose(onClose, pin.key);
 
   useFocusEffect(
     useCallback(() => {
@@ -122,11 +137,12 @@ export function PlacePreviewCard({
       exiting={FadeOutDown.duration(160)}
       style={styles.position}
     >
-      {/* The card follows the finger down. Its own view, so the fade-out above (when it closes)
-          starts from where the finger left it. */}
+      {/* The card follows the finger down. Its own view, so after a swipe the fade-out above
+          (when it closes) starts from below the screen, where the card slid to. */}
       <GestureDetector gesture={swipe.gesture}>
         <Animated.View
           style={swipe.style}
+          onLayout={swipe.onLayout}
           className={cn('gap-3 rounded-3xl border bg-background p-3 shadow-lg', mode.cardBorder)}
         >
           <View className="flex-row items-start gap-2 pl-1">
@@ -200,31 +216,69 @@ export function PlacePreviewCard({
   );
 }
 
-// Swipe down to close. The gesture starts only once the finger has moved 10 dp down. It gives up
-// when the finger moves 12 dp sideways first, so swiping through the photos still works, and taps
-// on the buttons never move far enough to start it. The card's position is a shared value moved
-// on the UI thread (Gesture Handler's default when Reanimated is installed), so it keeps up with
-// the finger without a round trip to JavaScript. Only closing goes to the JS thread
-// (scheduleOnRN), since it changes React state.
-function useSwipeDownToClose(onClose: () => void) {
+// Swipe down to close, like a native bottom sheet. The gesture starts only once the finger has
+// moved 10 dp down. It gives up when the finger moves 12 dp sideways first, so swiping through
+// the photos still works, and taps on the buttons never move far enough to start it.
+//
+// The card's position is a shared value moved on the UI thread (Gesture Handler's default when
+// Reanimated is installed), so it keeps up with the finger without a round trip to JavaScript.
+// When the finger lets go, the card springs back or slides off the bottom at the finger's speed,
+// and closes only once it's gone. Closing goes to the JS thread (scheduleOnRN), since it changes
+// React state. Grabbing the card while it moves picks it up where it is.
+function useSwipeDownToClose(onClose: () => void, pinKey: string) {
   const offset = useSharedValue(0);
+  // The offset the finger's movement adds to. It's taken when the gesture starts, less the 10 dp
+  // the finger moved before that, so the card doesn't jump.
+  const start = useSharedValue(0);
+  // The card's height: sliding down by this, plus the gap under it, takes it off the screen
+  const height = useSharedValue(0);
+
+  // Another pin tapped while the card slides away: its card shows in place, and setting the value
+  // cancels the slide, so the slide's close (which would close the new pin) never runs
+  useEffect(() => {
+    offset.set(0);
+  }, [pinKey, offset]);
+
   const gesture = usePanGesture({
     activeOffsetY: 10,
     failOffsetX: [-12, 12],
+    onActivate: (event) => {
+      'worklet';
+      start.set(offset.get() - event.translationY);
+    },
     onUpdate: (event) => {
       'worklet';
-      // Down only: dragging up keeps the card where it is
-      offset.value = Math.max(0, event.translationY);
+      const y = start.get() + event.translationY;
+      offset.set(y < 0 ? y * UP_RESISTANCE : y);
     },
     onDeactivate: (event) => {
       'worklet';
-      const isFarOrFast = event.translationY > CLOSE_DISTANCE || event.velocityY > CLOSE_VELOCITY;
-      if (!event.canceled && isFarOrFast) scheduleOnRN(onClose);
-      else offset.value = withSpring(0);
+      const restsAt = offset.get() + event.velocityY * MOMENTUM_SECONDS;
+      if (event.canceled || restsAt < CLOSE_DISTANCE) {
+        // Carries on at the finger's speed, then settles without a bounce
+        offset.set(withSpring(0, { velocity: event.velocityY }));
+        return;
+      }
+      const offScreen = height.get() + CARD_BOTTOM;
+      const duration = slideDuration(offScreen - offset.get(), event.velocityY);
+      offset.set(
+        withTiming(offScreen, { duration, easing: Easing.out(Easing.quad) }, (finished) => {
+          if (finished) scheduleOnRN(onClose);
+        }),
+      );
     },
   });
-  const style = useAnimatedStyle(() => ({ transform: [{ translateY: offset.value }] }));
-  return { gesture, style };
+  const style = useAnimatedStyle(() => ({ transform: [{ translateY: offset.get() }] }));
+  const onLayout = (event: LayoutChangeEvent) => height.set(event.nativeEvent.layout.height);
+  return { gesture, style, onLayout };
+}
+
+// The slide off the screen eases out, so it starts at twice its average speed. Lasting
+// 2 × distance ÷ speed, it starts at the finger's speed instead of jumping ahead or lagging behind.
+// The clamp keeps a slow let-go brisk and a hard flick still visible.
+function slideDuration(distance: number, velocity: number) {
+  'worklet';
+  return clamp((2000 * distance) / Math.max(velocity, 1), MIN_SLIDE_MS, MAX_SLIDE_MS);
 }
 
 // What Google says about the pin's place. A suggestion already has it all (rating, description,
@@ -382,5 +436,5 @@ function PhotoRow({ photoNames, category }: { photoNames: string[]; category?: s
 
 const styles = StyleSheet.create({
   // Above the bottom edge, leaving room for Google's logo under the card
-  position: { position: 'absolute', left: 12, right: 12, bottom: 40 },
+  position: { position: 'absolute', left: 12, right: 12, bottom: CARD_BOTTOM },
 });
