@@ -10,23 +10,30 @@ import { formatDistance, formatMinutes, routeWalkEstimate } from '@/lib/geo';
 import { useToday } from '@/lib/use-today';
 import { useRouter } from 'expo-router';
 import { MapIcon, NavigationIcon, PlusIcon } from 'lucide-react-native';
-import { Fragment, useState } from 'react';
-import { ActivityIndicator, ScrollView, View } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { DayPicker } from './components/day-picker';
+import { DragLayer } from './components/drag-layer';
 import { NextStopCard } from './components/next-stop-card';
-import { StopRow } from './components/stop-row';
-import { WalkLeg } from './components/walk-leg';
+import { SortableStops } from './components/sortable-stops';
 import { useItinerary, useItineraryActions, type Stop } from './use-itinerary';
+import { useStopDrag } from './use-stop-drag';
 
 // The plan tab: the trip day by day. Pick a day at the top, then see its stops in order (saved
-// sights, sweet spots and restaurants), with a rough walk between each two. On the trip's
-// current day, the next stop not done yet sits on top with Directions and Done. Under the stops:
-// add more saved places, show the day as a route on the map, or walk it in Google Maps.
+// sights, sweet spots and restaurants), with a rough walk between each two. Hold a stop to drag
+// it to another place in the day, or onto the bin to take it off. On the trip's current day, the
+// next stop not done yet sits on top with Directions and Done. Under the stops: add more saved
+// places, show the day as a route on the map, or walk it in Google Maps.
 export function PlanScreen() {
   const router = useRouter();
   const { trip, stops } = useItinerary();
   const actions = useItineraryActions(trip?._id);
+  const { drag, scrollRef, layerRef, listRef, binRef } = useStopDrag({
+    onMove: actions.moveTo,
+    onRemove: actions.remove,
+  });
   // The day tapped; null until then
   const [chosenDay, setChosenDay] = useState<number | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -61,7 +68,12 @@ export function PlanScreen() {
   return (
     <View className="flex-1 bg-background">
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
-        <ScrollView contentContainerClassName="gap-4 pb-12">
+        {/* Doesn't scroll by hand while a stop is dragged: the drag scrolls it near the edges */}
+        <Animated.ScrollView
+          ref={scrollRef}
+          scrollEnabled={drag.lifted === null}
+          contentContainerClassName="gap-4 pb-12"
+        >
           <View className="gap-1 px-4 pt-4">
             <Text variant="h3">Your plan</Text>
             <Text variant="muted">
@@ -94,11 +106,14 @@ export function PlanScreen() {
             ) : dayStops.length === 0 ? (
               <EmptyDay day={day} />
             ) : (
-              <StopList
+              <SortableStops
                 stops={dayStops}
                 isEditing={isEditing}
                 actions={actions}
                 onOpen={openStop}
+                drag={drag}
+                listRef={listRef}
+                layerRef={layerRef}
               />
             )}
             <DayActions
@@ -109,8 +124,9 @@ export function PlanScreen() {
               }
             />
           </View>
-        </ScrollView>
+        </Animated.ScrollView>
       </SafeAreaView>
+      <DragLayer drag={drag} isEditing={isEditing} layerRef={layerRef} binRef={binRef} />
     </View>
   );
 }
@@ -156,45 +172,6 @@ function DayHeading({
           <Text className="font-semibold text-blue-600">{isEditing ? 'Done' : 'Edit'}</Text>
         </Button>
       ) : null}
-    </View>
-  );
-}
-
-// The day's stops in order, with the walk between each two
-function StopList({
-  stops,
-  isEditing,
-  actions,
-  onOpen,
-}: {
-  stops: Stop[];
-  isEditing: boolean;
-  actions: ReturnType<typeof useItineraryActions>;
-  onOpen: (stop: Stop) => void;
-}) {
-  return (
-    <View>
-      {stops.map((stop, index) => {
-        const previous = stops[index - 1];
-        return (
-          <Fragment key={stop._id}>
-            {previous ? (
-              <WalkLeg from={previous.place.coordinates} to={stop.place.coordinates} />
-            ) : null}
-            <StopRow
-              stop={stop}
-              number={index + 1}
-              isFirst={index === 0}
-              isLast={index === stops.length - 1}
-              isEditing={isEditing}
-              onToggleDone={() => actions.toggleDone(stop)}
-              onMove={(direction) => actions.move(stop, direction)}
-              onRemove={() => actions.remove(stop)}
-              onOpen={() => onOpen(stop)}
-            />
-          </Fragment>
-        );
-      })}
     </View>
   );
 }

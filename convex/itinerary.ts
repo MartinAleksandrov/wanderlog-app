@@ -117,6 +117,36 @@ export const moveItem = mutation({
   },
 });
 
+// Puts a stop right before another stop of its day, or at the day's end (null): dragging a
+// stop in the plan. Saying which stop it goes before, not a position number, keeps it right
+// when the day holds items the plan doesn't show (notes) or someone else changed the day
+// meanwhile. The day is then numbered again 1, 2, 3…, writing only the items whose number
+// changed.
+export const moveItemTo = mutation({
+  args: {
+    itemId: v.id('itineraryItems'),
+    beforeItemId: v.union(v.id('itineraryItems'), v.null()),
+  },
+  handler: async (ctx, { itemId, beforeItemId }) => {
+    const item = await requireEditableItem(ctx, itemId);
+    if (beforeItemId === itemId) return;
+    const others = (await itemsOfDay(ctx, item.tripId, item.day)).filter(
+      (other) => other._id !== itemId,
+    );
+    // Not on this day (any more): to the end
+    const found = others.findIndex((other) => other._id === beforeItemId);
+    const index = found === -1 ? others.length : found;
+    const reordered = [...others.slice(0, index), item, ...others.slice(index)];
+    await Promise.all(
+      reordered.map(async (other, position) => {
+        if (other.order !== position + 1) {
+          await ctx.db.patch('itineraryItems', other._id, { order: position + 1 });
+        }
+      }),
+    );
+  },
+});
+
 // Ticks a stop off (or back on) while out on the day
 export const setDone = mutation({
   args: { itemId: v.id('itineraryItems'), done: v.boolean() },
