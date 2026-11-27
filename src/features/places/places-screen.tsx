@@ -11,11 +11,19 @@ import type { SuggestedPlace } from '@convex/googlePlaces';
 import type { PlaceKind } from '@convex/schema';
 import { useRouter } from 'expo-router';
 import { ExpandIcon, NavigationIcon } from 'lucide-react-native';
-import { useState } from 'react';
-import { ActivityIndicator, Pressable, SectionList, View } from 'react-native';
+import { useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Pressable,
+  SectionList,
+  View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from 'react-native';
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
 import Animated, { FadeInLeft, FadeInRight, LayoutAnimationConfig } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { BackToTopButton } from './components/back-to-top-button';
 import { CrawlCard } from './components/crawl-card';
 import { FilterChips } from './components/filter-chips';
 import type { CrawlSpot } from './crawl';
@@ -46,12 +54,17 @@ type Row = {
   distance?: number;
 };
 
+// "Back to top" shows once the list is scrolled this far down (in dp): past the banner, the chips
+// and a card or two
+const BACK_TO_TOP_AFTER = 600;
+
 // The third tab: the same places as the map, as a list with photos and details, for the side
 // switched on at the top (sights, sweet spots or restaurants) and the filters picked (kind and
 // "Open now", shared with the map). Saved ones first, then the suggestions that aren't saved
 // yet. In the city, each card says how far away it is and both lists go closest first;
 // otherwise Google's order (most popular first). Swiping left or right on the list switches to
-// the next or previous side, like pages; the switch stays above the list.
+// the next or previous side, like pages; the switch stays above the list. Once scrolled down, a
+// button at the bottom right goes back to the top.
 export function PlacesScreen() {
   const router = useRouter();
   const { mode, setKind, filter, setFilterId, openNow, setOpenNow } = usePlaceMode();
@@ -62,6 +75,8 @@ export function PlacesScreen() {
   const now = useNow();
   const swipe = useSideSwipe(mode.kind, setKind);
   const slideStep = useSlideStep(mode.kind);
+  const listRef = useRef<SectionList<Row>>(null);
+  const backToTop = useBackToTop(mode.kind);
 
   // The pop-up with more details. Name and photo go along so its top shows at once, and the
   // side, so its button saves to the same list.
@@ -125,7 +140,11 @@ export function PlacesScreen() {
                 className="flex-1"
               >
                 <SectionList
+                  ref={listRef}
                   sections={sections}
+                  onScroll={backToTop.onScroll}
+                  // Where the list is, about 10 times a second: plenty for showing the button
+                  scrollEventThrottle={100}
                   keyExtractor={(row) => row.key}
                   stickySectionHeadersEnabled={false}
                   // Every card on the list asks for its photo, and each one is a paid Google
@@ -200,6 +219,13 @@ export function PlacesScreen() {
                 />
               </Animated.View>
             </LayoutAnimationConfig>
+            {backToTop.isShown ? (
+              <BackToTopButton
+                onPress={() =>
+                  listRef.current?.getScrollResponder()?.scrollTo({ y: 0, animated: true })
+                }
+              />
+            ) : null}
           </View>
         </GestureDetector>
       </SafeAreaView>
@@ -238,6 +264,24 @@ function useSlideStep(kind: PlaceKind): 1 | -1 {
     return next.step;
   }
   return slide.step;
+}
+
+// Whether to show "Back to top": while the list is scrolled more than BACK_TO_TOP_AFTER down, so
+// it goes away by itself on the way back up. Each side has its own list, which opens at the top,
+// so switching sides hides it. That's adjusted during render, like useSlideStep above.
+function useBackToTop(kind: PlaceKind) {
+  const [state, setState] = useState({ kind, isShown: false });
+  if (state.kind !== kind) {
+    setState({ kind, isShown: false });
+  }
+  return {
+    isShown: state.kind === kind && state.isShown,
+    onScroll: (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const isShown = event.nativeEvent.contentOffset.y > BACK_TO_TOP_AFTER;
+      // Only when it changes, not on every scroll event
+      if (isShown !== state.isShown) setState({ kind, isShown });
+    },
+  };
 }
 
 // The list's cards: the saved places (with Google's fresh details when they're in the searched
