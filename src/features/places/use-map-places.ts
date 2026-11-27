@@ -1,6 +1,6 @@
 import { useNow } from '@/lib/use-now';
 import type { Doc } from '@convex/_generated/dataModel';
-import type { SuggestedPlace } from '@convex/googlePlaces';
+import type { PlaceSuggestion, SuggestedPlace } from '@convex/googlePlaces';
 import { useState, type RefObject } from 'react';
 import type MapView from 'react-native-maps';
 import type { Region } from 'react-native-maps';
@@ -11,6 +11,7 @@ import { passesFilters, type FilterablePlace } from './place-filters';
 import { usePlaceMode } from './place-mode-context';
 import { useTripPlaces } from './trip-places';
 import { useExploreCity } from './use-explore-city';
+import { useMapSearch } from './use-map-search';
 import { usePlaceActions } from './use-place-actions';
 
 // Where the map opens for someone without a trip: Europe
@@ -23,14 +24,17 @@ const NO_TRIP_REGION: Region = {
 
 // What the map tab shows: the active trip's places, or, while exploring a city found with the
 // search bar, that city's places; sights, sweet spots or restaurants, whichever side is switched
-// on. Pins are ready to draw; tapping one selects it, which opens its pop-up at the bottom
+// on. Words searched with the search bar ("coffee") show their places instead of either. Pins
+// are ready to draw; tapping one selects it, which opens its pop-up at the bottom
 // (place-preview-card.tsx).
 export function useMapPlaces(mapRef: RefObject<MapView | null>) {
   const { trip, kind, area, saved, suggestions, searchArea } = useTripPlaces();
   const { add, confirmRemove } = usePlaceActions(trip?._id, kind);
   const explore = useExploreCity(trip?._id ?? null, area, mapRef);
+  const search = useMapSearch(trip?._id ?? null, mapRef);
   const { exploring } = explore;
-  const shown = exploring ? explore.suggestions : suggestions;
+  const { textSearch } = search;
+  const shown = textSearch ? search.results : exploring ? explore.suggestions : suggestions;
   const { filter, openNow } = usePlaceMode();
   const now = useNow();
   // The pin whose pop-up is open. Remembered by key (the Google place ID), so the pop-up stays
@@ -45,9 +49,22 @@ export function useMapPlaces(mapRef: RefObject<MapView | null>) {
     isOpen: isOpen(openStatus(pin.suggestion?.hours, now)),
   });
   const filters = { filter, openNow };
-  const pins = allPins.filter((pin) => passesFilters(filterable(pin), filters));
-  const shownArea = exploring?.area ?? area;
-  const searchShownArea = exploring ? explore.searchArea : searchArea;
+  // The place picked in the search bar, while its pop-up is open: it keeps its pin wherever it
+  // is and whatever the filters say. Closing the pop-up or tapping another pin removes the pin,
+  // unless the place was saved (then it's one of the saved pins).
+  const picked = search.picked?.providerPlaceId === selectedKey ? search.picked : null;
+  const pins = allPins.filter(
+    (pin) => pin.key === picked?.providerPlaceId || passesFilters(filterable(pin), filters),
+  );
+  if (picked && !pins.some((pin) => pin.key === picked.providerPlaceId)) {
+    pins.push(suggestionPin(picked));
+  }
+  const shownArea = textSearch?.area ?? exploring?.area ?? area;
+  const searchShownArea = textSearch
+    ? search.searchTextArea
+    : exploring
+      ? explore.searchArea
+      : searchArea;
   const widerArea = shownArea ? widerSearchArea(shownArea) : null;
 
   return {
@@ -55,7 +72,15 @@ export function useMapPlaces(mapRef: RefObject<MapView | null>) {
     trip,
     kind,
     explore,
-    // The suggestion pins' search: the explored city's, otherwise the trip's
+    search,
+    // The pin of the place picked in the search bar, while its pop-up is open
+    pickedKey: picked?.providerPlaceId ?? null,
+    // Picking a place in the search bar: its pin opens once Google says where it is
+    pickPlace: async (suggestion: PlaceSuggestion) => {
+      const key = await search.pickPlace(suggestion);
+      if (key !== null) setSelectedKey(key);
+    },
+    // The suggestion pins' search: the searched words', the explored city's, otherwise the trip's
     shown,
     shownArea,
     searchShownArea,
@@ -67,7 +92,11 @@ export function useMapPlaces(mapRef: RefObject<MapView | null>) {
       mapRef.current?.animateToRegion(areaToRegion(widerArea), 700);
       searchShownArea(widerArea);
     },
-    title: exploring ? `Exploring ${exploring.destination.name}` : (trip?.name ?? ''),
+    title: textSearch
+      ? `“${textSearch.query}”`
+      : exploring
+        ? `Exploring ${exploring.destination.name}`
+        : (trip?.name ?? ''),
     initialRegion: area ? areaToRegion(area) : NO_TRIP_REGION,
     pins,
     // Every pin before filtering, to count the filter chips
@@ -112,15 +141,18 @@ function toPins(saved: Doc<'places'>[], suggestions: SuggestedPlace[]): Pin[] {
         suggestion,
       };
     }),
-    ...suggestions
-      .filter((place) => !savedIds.has(place.providerPlaceId))
-      .map((place) => ({
-        key: place.providerPlaceId,
-        name: place.name,
-        photoName: place.photoName,
-        category: place.category,
-        coordinates: place.coordinates,
-        suggestion: place,
-      })),
+    ...suggestions.filter((place) => !savedIds.has(place.providerPlaceId)).map(suggestionPin),
   ];
+}
+
+// The pin of a place that isn't saved
+function suggestionPin(place: SuggestedPlace): Pin {
+  return {
+    key: place.providerPlaceId,
+    name: place.name,
+    photoName: place.photoName,
+    category: place.category,
+    coordinates: place.coordinates,
+    suggestion: place,
+  };
 }

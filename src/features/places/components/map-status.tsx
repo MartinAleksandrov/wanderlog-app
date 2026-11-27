@@ -2,14 +2,14 @@ import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { errorMessage } from '@/lib/error-message';
-import { ExpandIcon, RotateCwIcon, SearchIcon } from 'lucide-react-native';
-import { ActivityIndicator, View } from 'react-native';
+import { ExpandIcon, RotateCwIcon, SearchIcon, XIcon } from 'lucide-react-native';
+import { ActivityIndicator, Pressable, View } from 'react-native';
 import type { Region } from 'react-native-maps';
 import { hasMovedAway, regionToArea } from '../map-area';
 import type { SearchArea } from '../trip-places';
 
 type MapStatusProps = {
-  // "Trip to Porto" or "Exploring Paris"
+  // "Trip to Porto", "Exploring Paris" or "“coffee”"
   title: string;
   // The area the orange pins were searched in, and what the map shows now
   searchedArea: SearchArea;
@@ -22,6 +22,8 @@ type MapStatusProps = {
   onSearchArea: (area: SearchArea) => void;
   // Set when few places were found: "Search 10 km wide", which doubles the area
   wider?: { label: string; onPress: () => void };
+  // Set while showing searched words' places: an ✕ in the pill goes back to the usual places
+  onClose?: () => void;
 };
 
 // Under the map's search bar: what the map is showing and how many places, the
@@ -37,16 +39,27 @@ export function MapStatus({
   onRetry,
   onSearchArea,
   wider,
+  onClose,
 }: MapStatusProps) {
   const visibleArea = region ? regionToArea(region) : null;
 
   return (
     <View pointerEvents="box-none" className="items-center gap-2">
       <View className="flex-row items-center gap-2 rounded-full bg-background px-4 py-2 shadow-md">
-        <Text className="font-semibold" numberOfLines={1}>
+        <Text className="shrink font-semibold" numberOfLines={1}>
           {title}
         </Text>
         {isLoading ? <ActivityIndicator size="small" /> : <Text variant="muted">{countLabel}</Text>}
+        {onClose ? (
+          <Pressable
+            onPress={onClose}
+            hitSlop={12}
+            aria-label="Close search"
+            className="-mr-1 rounded-full active:bg-accent"
+          >
+            <Icon as={XIcon} className="size-4 text-muted-foreground" />
+          </Pressable>
+        ) : null}
       </View>
       {visibleArea && !isLoading && hasMovedAway(searchedArea, visibleArea) ? (
         <Button

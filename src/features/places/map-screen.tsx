@@ -20,7 +20,8 @@ import { PlacePreviewCard } from './components/place-preview-card';
 import { isFiltered } from './place-filters';
 import { usePlaceMode } from './place-mode-context';
 import type { PlaceMode } from './place-modes';
-import { FEW_PLACES } from './map-area';
+import { FEW_PLACES, regionToArea } from './map-area';
+import type { SearchArea } from './trip-places';
 import { useDistanceTo } from './use-distance';
 import { useLocateMe } from './use-locate-me';
 import { useMapPlaces } from './use-map-places';
@@ -36,8 +37,10 @@ import { useRevealPin } from './use-reveal-pin';
 // dots where they'd cover each other and grow back as you zoom in (pin-layout.ts). Tapping a pin
 // opens its pop-up at the bottom, sliding the map up first if the pop-up would cover the pin;
 // tapping the map closes it. The search bar finds any city: the map flies there, shows its
-// places, and offers to plan a trip to it (use-explore-city.ts). The button at the bottom right
-// flies to where you are (use-locate-me.ts).
+// places, and offers to plan a trip to it (use-explore-city.ts). It also finds single places (a
+// café, a museum: the map flies there and opens its pop-up) and searches words such as "coffee"
+// in the area the map shows, every match a pin (use-map-search.ts). The button at the bottom
+// right flies to where you are (use-locate-me.ts).
 //
 // Opened from the plan tab with ?day=N, the map shows that day's stops as a numbered route
 // instead (use-map-route.ts).
@@ -141,6 +144,7 @@ export function MapScreen() {
               places={places}
               query={query}
               onQueryChange={setQuery}
+              visibleArea={regionToArea(region ?? initialRegion)}
               userRegion={userRegion}
               isFilterOpen={isFilterOpen}
               onFilterOpenChange={setFilterOpen}
@@ -154,8 +158,12 @@ export function MapScreen() {
           pin={selected}
           mode={mode}
           distance={distanceTo?.(selected.coordinates)}
-          exploringCity={exploring?.destination.name}
-          onAdd={() => places.addPin(selected)}
+          // A place picked in the search bar can be anywhere, not only in the explored city: it
+          // is saved to the trip like any other, so it never offers to plan the explored city
+          exploringCity={
+            selected.key === places.pickedKey ? undefined : exploring?.destination.name
+          }
+          onAdd={trip ? () => places.addPin(selected) : undefined}
           onRemove={() => places.removePin(selected)}
           onPlanTrip={explore.planTrip}
           onClose={() => select(null)}
@@ -164,7 +172,7 @@ export function MapScreen() {
         <MapBottom
           mode={mode}
           locateMe={locateMe}
-          showsHint={trip === null && !exploring}
+          showsHint={trip === null && !exploring && !places.search.textSearch}
           showsLegend={Boolean(trip) && !selected && !isRoute}
         />
       )}
@@ -176,11 +184,12 @@ type MapPlaces = ReturnType<typeof useMapPlaces>;
 
 // The top of the map while it shows places: the search bar, then (unless typing) the side
 // switch with the filter button (and its panel when open), the explored city with "Plan trip",
-// and what the map shows with "Search this area" or "Search wider"
+// and what the map shows with "Search this area" or "Search wider" (and an ✕ for searched words)
 function PlacesOverlay({
   places,
   query,
   onQueryChange,
+  visibleArea,
   userRegion,
   isFilterOpen,
   onFilterOpenChange,
@@ -188,12 +197,15 @@ function PlacesOverlay({
   places: MapPlaces;
   query: string;
   onQueryChange: (query: string) => void;
+  // What the map shows now: the search bar's suggestions come from near it, and words are
+  // searched on it
+  visibleArea: SearchArea;
   userRegion: Region | null;
   isFilterOpen: boolean;
   onFilterOpenChange: (isOpen: boolean) => void;
 }) {
   const { mode } = usePlaceMode();
-  const { explore, select, shown, shownArea, widerArea } = places;
+  const { explore, search, select, shown, shownArea, widerArea } = places;
   const count = shown.data?.length ?? 0;
   const isSparse = !shown.isFetching && shown.error === null && count < FEW_PLACES;
   // "7 of 18 sweet spots" while filtered, so it's clear some pins are hidden
@@ -205,12 +217,28 @@ function PlacesOverlay({
     <>
       <MapSearchBar
         value={query}
-        isBusy={explore.isLocating}
+        isBusy={explore.isLocating || search.isBusy}
+        near={visibleArea}
         onChangeText={onQueryChange}
-        onSelect={(destination) => {
+        onSelectCity={(destination) => {
           onQueryChange('');
           select(null);
+          // The city's own places replace any searched words'
+          search.stopText();
           void explore.start(destination);
+        }}
+        // The filter panel and a pin pop-up don't share the screen, and the panel's counts belong
+        // to the places shown before the words were searched
+        onSelectPlace={(place) => {
+          onQueryChange('');
+          onFilterOpenChange(false);
+          void places.pickPlace(place);
+        }}
+        onSearchText={(words) => {
+          onQueryChange('');
+          select(null);
+          onFilterOpenChange(false);
+          void search.startText(words, visibleArea);
         }}
       />
       {query === '' ? (
@@ -226,7 +254,11 @@ function PlacesOverlay({
               region={explore.exploring.destination.region}
               photoName={explore.exploring.photoName}
               onPlanTrip={explore.planTrip}
-              onClose={explore.stop}
+              // Words searched in the city end with it: the map flies back to the trip
+              onClose={() => {
+                search.stopText();
+                explore.stop();
+              }}
             />
           ) : null}
           {shownArea ? (
@@ -239,6 +271,7 @@ function PlacesOverlay({
               error={shown.error}
               onRetry={() => void shown.refetch()}
               onSearchArea={places.searchShownArea}
+              onClose={search.textSearch ? search.stopText : undefined}
               wider={
                 isSparse && widerArea
                   ? {

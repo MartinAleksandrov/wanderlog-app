@@ -75,6 +75,8 @@ export type PlaceDetails = SuggestedPlace & {
   // This week's hours ("Monday: 9:00 AM – 6:00 PM", …); whether it's open now is in `hours`
   openingHours?: string[];
   reviews: PlaceReview[];
+  // Which side of the app the place belongs on, from its primary type (see kindOfType)
+  kind: PlaceKind;
 };
 
 // What each side of the app searches Google for. Names from Google's "Table A" place types
@@ -162,6 +164,48 @@ function isWellRated(place: SuggestedPlace, kind: PlaceKind): boolean {
   return rule === undefined || rule(place.rating ?? 0, place.ratingCount ?? 0);
 }
 
+// Food places the nearby searches don't look for, but someone can search for by name or words.
+// Only compared here, never sent to Google, so a name Google doesn't use costs nothing.
+const MORE_SWEET_TYPES = [
+  'acai_shop',
+  'bagel_shop',
+  'candy_store',
+  'juice_shop',
+  'cat_cafe',
+  'dog_cafe',
+  'chocolate_factory',
+];
+const MORE_RESTAURANT_TYPES = [
+  'diner',
+  'bistro',
+  'gastropub',
+  'bar_and_grill',
+  'sandwich_shop',
+  'deli',
+  'cafeteria',
+  'food_court',
+  'meal_takeaway',
+  'meal_delivery',
+];
+
+// Which side of the app a place found with the map's search bar belongs on, from its primary
+// type: cafés and bakeries are sweet spots, any place for a meal a restaurant, anything else
+// (museums, parks, shops, bars) a place to visit. Sweet spots are checked first: Google files
+// brunch and dessert places as restaurants too. Restaurants include the ones the nearby search
+// leaves out (fast food, diners, takeaways): someone who searched for one wants it.
+function kindOfType(type: string | undefined): PlaceKind {
+  if (type === undefined) return 'sight';
+  if (PLACE_TYPES.sweet.includes(type) || MORE_SWEET_TYPES.includes(type)) return 'sweet';
+  if (
+    PLACE_TYPES.restaurant.includes(type) ||
+    MORE_RESTAURANT_TYPES.includes(type) ||
+    type.endsWith('_restaurant')
+  ) {
+    return 'restaurant';
+  }
+  return 'sight';
+}
+
 // Google bills a request at the price tier of its most expensive field. rating, userRatingCount
 // and currentOpeningHours are "Nearby Search Enterprise", utcOffsetMinutes "Pro", and
 // editorialSummary (the short description) "Enterprise + Atmosphere", the highest: so the whole
@@ -188,6 +232,8 @@ type GooglePlace = {
   shortFormattedAddress?: string;
   location?: Coordinates;
   photos?: { name: string }[];
+  // Google's name for the type ("coffee_shop"), and how it's shown ("Coffee shop")
+  primaryType?: string;
   primaryTypeDisplayName?: { text: string };
   rating?: number;
   userRatingCount?: number;
@@ -217,12 +263,14 @@ function hoursOf(place: GooglePlace): PlaceHours | undefined {
 // The place pop-up's fields. Hours, website and phone are the "Place Details Enterprise" tier,
 // editorialSummary and reviews "Enterprise + Atmosphere": 1,000 free calls a month. The app
 // caches the answer per place, so opening the same place again doesn't call Google.
+// primaryType (which side a searched place goes on) is a cheaper tier, so it costs nothing extra.
 const DETAILS_FIELDS = [
   'id',
   'displayName',
   'formattedAddress',
   'location',
   'photos',
+  'primaryType',
   'primaryTypeDisplayName',
   'googleMapsUri',
   'rating',
@@ -254,6 +302,8 @@ type GoogleAutocompleteResponse = {
     placePrediction?: {
       placeId: string;
       structuredFormat: { mainText: { text: string }; secondaryText?: { text: string } };
+      // All of the place's types ("locality", "coffee_shop", "establishment"…), in no set order
+      types?: string[];
     };
   }[];
 };
@@ -518,6 +568,134 @@ function isInside({ center, widthMeters, heightMeters }: SearchArea, point: Coor
   return Math.abs(north) <= heightMeters / 2 && Math.abs(east) <= widthMeters / 2;
 }
 
+// The rectangle as Google takes it: its south-west and north-east corners. A map zoomed out to
+// the whole world is capped just short of 360 degrees wide, so the corners stay apart.
+function toRectangle({ center, widthMeters, heightMeters }: SearchArea) {
+  const north = heightMeters / 2 / METERS_PER_DEGREE;
+  const east = Math.min(widthMeters / 2 / metersPerLongitudeDegree(center.latitude), 179);
+  return {
+    low: {
+      latitude: Math.max(center.latitude - north, -90),
+      longitude: wrapLongitude(center.longitude - east),
+    },
+    high: {
+      latitude: Math.min(center.latitude + north, 90),
+      longitude: wrapLongitude(center.longitude + east),
+    },
+  };
+}
+
+// A single place the map's search bar suggests: a café, a museum, a hotel, an address
+export type PlaceSuggestion = {
+  placeId: string;
+  name: string;
+  address: string;
+  // Google's types as words ("coffee shop cafe food store establishment"), only to pick the
+  // row's icon. Missing for addresses and streets, which get a plain pin.
+  typeWords?: string;
+};
+
+// What the map's search bar suggests for what's typed so far: a city (the map explores it) or a
+// single place (the map flies to it and opens its pop-up)
+export type MapSearchSuggestion =
+  ({ type: 'city' } & DestinationSuggestion) | ({ type: 'place' } & PlaceSuggestion);
+
+// Google's types for a city, as its "(cities)" filter has them
+const CITY_TYPES = ['locality', 'administrative_area_level_3', 'postal_town'];
+// Countries and regions: too big to explore as a city or to show as one pin. Left out, as the
+// cities-only search always did.
+const REGION_TYPES = [
+  'country',
+  'administrative_area_level_1',
+  'administrative_area_level_2',
+  'colloquial_area',
+];
+
+// Cities and places matching what the user has typed so far, the ones near where the map looks
+// first. One autocomplete request with no type filter: Google's "(cities)" filter can't be
+// combined with other types, and two requests would cost twice as much.
+export const searchMap = action({
+  args: { query: v.string(), near: v.optional(searchArea) },
+  handler: async (ctx, { query, near }): Promise<MapSearchSuggestion[]> => {
+    const data = await placesRequest<GoogleAutocompleteResponse>(ctx, 'places:autocomplete', {
+      body: { input: query, ...(near ? { locationBias: { rectangle: toRectangle(near) } } : {}) },
+    });
+    return (data.suggestions ?? []).flatMap(({ placePrediction }) =>
+      placePrediction ? toMapSuggestion(placePrediction) : [],
+    );
+  },
+});
+
+type GooglePrediction = NonNullable<
+  NonNullable<GoogleAutocompleteResponse['suggestions']>[number]['placePrediction']
+>;
+
+// One of Google's predictions as a city or a place, or nothing for a country or region
+function toMapSuggestion(prediction: GooglePrediction): MapSearchSuggestion[] {
+  const types = prediction.types ?? [];
+  const placeId = prediction.placeId;
+  const name = prediction.structuredFormat.mainText.text;
+  const secondary = prediction.structuredFormat.secondaryText?.text ?? '';
+  if (types.some((type) => CITY_TYPES.includes(type))) {
+    return [{ type: 'city', placeId, name, region: secondary }];
+  }
+  if (types.some((type) => REGION_TYPES.includes(type))) return [];
+  return [
+    {
+      type: 'place',
+      placeId,
+      name,
+      address: secondary,
+      typeWords: types.includes('establishment') ? types.join(' ').replaceAll('_', ' ') : undefined,
+    },
+  ];
+}
+
+// The nearby search's fields, plus each place's type to tell which side most of them belong on
+const TEXT_SEARCH_FIELDS = `${NEARBY_FIELDS},places.primaryType`;
+
+// What a text search found, and the side most of the places belong on ("coffee" → sweet spots),
+// null when nothing was found
+export type TextSearchResult = { kind: PlaceKind | null; places: SuggestedPlace[] };
+
+// Every place matching words such as "coffee" or "sushi" on the map's rectangle: one page of
+// Google's Text Search (at most 20), best matches first. The same price tier as the nearby search
+// (the same fields), but one request instead of four. No rating rules: the user asked for these.
+export const searchText = action({
+  args: { query: v.string(), area: searchArea },
+  handler: async (ctx, { query, area }): Promise<TextSearchResult> => {
+    const data = await placesRequest<{ places?: GooglePlace[] }>(ctx, 'places:searchText', {
+      fieldMask: TEXT_SEARCH_FIELDS,
+      body: {
+        textQuery: query,
+        pageSize: PLACES_PER_SEARCH,
+        locationRestriction: { rectangle: toRectangle(area) },
+      },
+    });
+    const found = (data.places ?? []).filter((place) => place.location && place.displayName);
+    return { kind: mostCommonKind(found), places: found.flatMap(toSuggestedPlace) };
+  },
+});
+
+// The side most of the places belong on; on a tie, the best match's (a Map keeps the order its
+// keys were added in, and only a higher count takes over)
+function mostCommonKind(places: GooglePlace[]): PlaceKind | null {
+  const counts = new Map<PlaceKind, number>();
+  for (const place of places) {
+    const kind = kindOfType(place.primaryType);
+    counts.set(kind, (counts.get(kind) ?? 0) + 1);
+  }
+  let best: PlaceKind | null = null;
+  let bestCount = 0;
+  for (const [kind, count] of counts) {
+    if (count > bestCount) {
+      best = kind;
+      bestCount = count;
+    }
+  }
+  return best;
+}
+
 // More about one place, for the pop-up that opens when a place is tapped
 export const placeDetails = action({
   args: { placeId: v.string() },
@@ -545,6 +723,7 @@ export const placeDetails = action({
       website: place.websiteUri,
       phone: place.internationalPhoneNumber,
       hours: hoursOf(place),
+      kind: kindOfType(place.primaryType),
       openingHours: place.currentOpeningHours?.weekdayDescriptions,
       reviews: (place.reviews ?? []).slice(0, 3).flatMap((review) =>
         review.text?.text
