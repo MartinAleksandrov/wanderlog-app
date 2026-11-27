@@ -18,6 +18,11 @@ export function isClockTime(time: string): boolean {
   return CLOCK_TIME.test(time);
 }
 
+// The UTC calendar date of a moment, 'YYYY-MM-DD' (Date.now() → today on the server's clock)
+export function utcDateOf(time: number): string {
+  return new Date(time).toISOString().slice(0, 10);
+}
+
 // The date a number of days later (or earlier, with a negative number)
 export function addDaysToDate(date: string, days: number): string {
   const parsed = new Date(`${date}T00:00:00Z`);

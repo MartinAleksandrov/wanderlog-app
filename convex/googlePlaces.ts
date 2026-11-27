@@ -1,6 +1,13 @@
 import { ConvexError, v, type Infer } from 'convex/values';
+import { internal } from './_generated/api';
 import { action, type ActionCtx } from './_generated/server';
-import { coordinates, placeKind, type Coordinates, type PlaceKind } from './schema';
+import {
+  coordinates,
+  placeKind,
+  type Coordinates,
+  type GoogleRequestKind,
+  type PlaceKind,
+} from './schema';
 import { toLatin } from './lib/latin';
 
 // Google Places API (New), called from our backend so the API key never ships inside the app.
@@ -438,9 +445,12 @@ export const nearbyPlaces = action({
       kind === 'sight'
         ? { includedTypes: PLACE_TYPES.sight }
         : { includedPrimaryTypes: PLACE_TYPES[kind] };
+    const circles = quarterCircles(area);
+    // The quarters go to Google together, so they're counted together
+    const key = await startRequests(ctx, 'nearby', circles.length);
     const answers = await Promise.allSettled(
-      quarterCircles(area).map((circle) =>
-        placesRequest<{ places?: GooglePlace[] }>(ctx, 'places:searchNearby', {
+      circles.map((circle) =>
+        sendRequest<{ places?: GooglePlace[] }>(key, 'places:searchNearby', {
           fieldMask: NEARBY_FIELDS,
           body: {
             ...types,
@@ -747,26 +757,51 @@ export const placeDetails = action({
 // toLatin spells the Cyrillic ones in Latin letters.
 const PLACES_LANGUAGE = 'en';
 
-// One call to the Places API. Only signed-in users may call it, because every call costs money.
-async function placesRequest<T>(
-  ctx: ActionCtx,
-  path: string,
-  {
-    method = 'POST',
-    fieldMask,
-    body,
-  }: { method?: 'GET' | 'POST'; fieldMask?: string; body?: object },
-): Promise<T> {
-  if ((await ctx.auth.getUserIdentity()) === null) {
-    throw new ConvexError('Please sign in again.');
-  }
+// Which kind of request a call is, for the count (see googleRequestKind in schema.ts). Every GET
+// in this file reads one place's details; the POSTs go to the three search endpoints.
+function requestKind(method: 'GET' | 'POST', path: string): GoogleRequestKind {
+  if (method === 'GET') return 'details';
+  if (path === 'places:searchNearby') return 'nearby';
+  if (path === 'places:searchText') return 'textSearch';
+  return 'autocomplete';
+}
+
+type RequestOptions = { method?: 'GET' | 'POST'; fieldMask?: string; body?: object };
+
+// Gets `count` requests of one kind ready to send, and returns the API key for them. Only
+// signed-in users who aren't suspended may send any, because every request costs money.
+// First the key: a deployment without one sends nothing, so it counts nothing either. Then the
+// count, per user (the admin dashboard's numbers), in a mutation, since an action can't read the
+// database itself. That mutation also throws for a signed-out or suspended caller.
+// Requests sent together (the map's four quarters) are counted in one go: four counts at the
+// same moment would clash on the same row, and Convex would run them one after another.
+async function startRequests(ctx: ActionCtx, kind: GoogleRequestKind, count = 1): Promise<string> {
   const key = process.env.GOOGLE_MAPS_API_KEY;
   if (!key) {
     throw new ConvexError(
       'Place search is not set up yet: GOOGLE_MAPS_API_KEY is missing on the Convex deployment.',
     );
   }
+  await ctx.runMutation(internal.googleRequests.record, { kind, count });
+  return key;
+}
 
+// One call to the Places API, counted and checked first (startRequests)
+async function placesRequest<T>(
+  ctx: ActionCtx,
+  path: string,
+  options: RequestOptions = {},
+): Promise<T> {
+  const key = await startRequests(ctx, requestKind(options.method ?? 'POST', path));
+  return await sendRequest<T>(key, path, options);
+}
+
+// The call itself, for requests that startRequests has already counted
+async function sendRequest<T>(
+  key: string,
+  path: string,
+  { method = 'POST', fieldMask, body }: RequestOptions,
+): Promise<T> {
   let response: Response;
   try {
     // GET (place details) takes the language in the URL, POST (searches) in the body

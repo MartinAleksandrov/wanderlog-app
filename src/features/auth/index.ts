@@ -2,5 +2,6 @@
 // never from files inside the folder.
 export { SignOutButton } from './components/sign-out-button';
 export { SigningInScreen } from './components/signing-in-screen';
+export { SuspendedScreen } from './components/suspended-screen';
 export { SignInScreen } from './sign-in-screen';
 export { SignUpScreen } from './sign-up-screen';

@@ -8,8 +8,10 @@
  * @module
  */
 
+import type * as admin from "../admin.js";
 import type * as bookings from "../bookings.js";
 import type * as googlePlaces from "../googlePlaces.js";
+import type * as googleRequests from "../googleRequests.js";
 import type * as http from "../http.js";
 import type * as itinerary from "../itinerary.js";
 import type * as journal from "../journal.js";
@@ -29,8 +31,10 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  admin: typeof admin;
   bookings: typeof bookings;
   googlePlaces: typeof googlePlaces;
+  googleRequests: typeof googleRequests;
   http: typeof http;
   itinerary: typeof itinerary;
   journal: typeof journal;

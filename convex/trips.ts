@@ -1,6 +1,6 @@
 import { ConvexError, v } from 'convex/values';
-import type { Doc } from './_generated/dataModel';
-import { mutation, query, type QueryCtx } from './_generated/server';
+import type { Doc, Id } from './_generated/dataModel';
+import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
 import { tripDayCount } from './itinerary';
 import { isCalendarDate } from './lib/dates';
 import { TRIP_MAX_DAYS, TRIP_NAME_MAX_LENGTH, TRIP_NOTES_MAX_LENGTH } from './lib/limits';
@@ -196,38 +196,43 @@ export const setActive = mutation({
   },
 });
 
-// Deletes a trip and everything in it. Owners only. Convex has no cascading deletes, so the
-// trip's itinerary, places, bookings and memberships are deleted here first.
+// Deletes a trip and everything in it. Owners only.
 export const remove = mutation({
   args: { tripId: v.id('trips') },
   handler: async (ctx, { tripId }) => {
     const user = await requireUser(ctx);
     await requireTripRole(ctx, user._id, tripId, 'owner');
-
-    const [items, places, bookings, members] = await Promise.all([
-      ctx.db
-        .query('itineraryItems')
-        .withIndex('by_trip_and_day_and_order', (q) => q.eq('tripId', tripId))
-        .collect(),
-      ctx.db
-        .query('places')
-        .withIndex('by_trip', (q) => q.eq('tripId', tripId))
-        .collect(),
-      ctx.db
-        .query('bookings')
-        .withIndex('by_trip_and_start', (q) => q.eq('tripId', tripId))
-        .collect(),
-      ctx.db
-        .query('tripMembers')
-        .withIndex('by_trip_and_user', (q) => q.eq('tripId', tripId))
-        .collect(),
-    ]);
-    await Promise.all([
-      ...items.map((item) => ctx.db.delete('itineraryItems', item._id)),
-      ...places.map((place) => ctx.db.delete('places', place._id)),
-      ...bookings.map((booking) => ctx.db.delete('bookings', booking._id)),
-      ...members.map((member) => ctx.db.delete('tripMembers', member._id)),
-    ]);
-    await ctx.db.delete('trips', tripId);
+    await deleteTripAndContents(ctx, tripId);
   },
 });
+
+// A trip and everything in it, with no permission check: the caller has done that (trips.remove,
+// and the admin's "Delete data"). Convex has no cascading deletes, so the trip's itinerary,
+// places, bookings and memberships are deleted here first.
+export async function deleteTripAndContents(ctx: MutationCtx, tripId: Id<'trips'>) {
+  const [items, places, bookings, members] = await Promise.all([
+    ctx.db
+      .query('itineraryItems')
+      .withIndex('by_trip_and_day_and_order', (q) => q.eq('tripId', tripId))
+      .collect(),
+    ctx.db
+      .query('places')
+      .withIndex('by_trip', (q) => q.eq('tripId', tripId))
+      .collect(),
+    ctx.db
+      .query('bookings')
+      .withIndex('by_trip_and_start', (q) => q.eq('tripId', tripId))
+      .collect(),
+    ctx.db
+      .query('tripMembers')
+      .withIndex('by_trip_and_user', (q) => q.eq('tripId', tripId))
+      .collect(),
+  ]);
+  await Promise.all([
+    ...items.map((item) => ctx.db.delete('itineraryItems', item._id)),
+    ...places.map((place) => ctx.db.delete('places', place._id)),
+    ...bookings.map((booking) => ctx.db.delete('bookings', booking._id)),
+    ...members.map((member) => ctx.db.delete('tripMembers', member._id)),
+  ]);
+  await ctx.db.delete('trips', tripId);
+}
