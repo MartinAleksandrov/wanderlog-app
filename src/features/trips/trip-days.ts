@@ -1,4 +1,5 @@
 import { addDays, daysBetween, formatDate, fromIsoDate } from '@/lib/dates';
+import { APP_LOCALE } from '@/lib/locale';
 import { TRIP_MAX_DAYS } from '@convex/lib/limits';
 
 // A trip's first and last day, 'YYYY-MM-DD'
@@ -31,7 +32,7 @@ export type TripDay = {
   label: string;
 };
 
-// Every day of a trip, first to last, labelled in the phone's language
+// Every day of a trip, first to last, labelled in English
 export function tripDays(startDate: string, endDate: string): TripDay[] {
   const count = daysBetween(startDate, endDate) + 1;
   return Array.from({ length: count }, (_, index) => {
@@ -40,8 +41,8 @@ export function tripDays(startDate: string, endDate: string): TripDay[] {
     return {
       day: index + 1,
       date,
-      weekday: local.toLocaleDateString(undefined, { weekday: 'short' }),
-      label: local.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }),
+      weekday: local.toLocaleDateString(APP_LOCALE, { weekday: 'short' }),
+      label: local.toLocaleDateString(APP_LOCALE, { day: 'numeric', month: 'short' }),
     };
   });
 }

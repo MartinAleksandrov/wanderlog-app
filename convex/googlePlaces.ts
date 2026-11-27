@@ -1,6 +1,7 @@
 import { ConvexError, v, type Infer } from 'convex/values';
 import { action, type ActionCtx } from './_generated/server';
 import { coordinates, placeKind, type Coordinates, type PlaceKind } from './schema';
+import { toLatin } from './lib/latin';
 
 // Google Places API (New), called from our backend so the API key never ships inside the app.
 // Set the key once per deployment: npx convex env set GOOGLE_MAPS_API_KEY <key>
@@ -320,8 +321,8 @@ export const searchDestinations = action({
         ? [
             {
               placeId: p.placeId,
-              name: p.structuredFormat.mainText.text,
-              region: p.structuredFormat.secondaryText?.text ?? '',
+              name: toLatin(p.structuredFormat.mainText.text),
+              region: toLatin(p.structuredFormat.secondaryText?.text ?? ''),
             },
           ]
         : [],
@@ -370,8 +371,8 @@ export const searchStays = action({
         ? [
             {
               placeId: p.placeId,
-              name: p.structuredFormat.mainText.text,
-              address: p.structuredFormat.secondaryText?.text ?? '',
+              name: toLatin(p.structuredFormat.mainText.text),
+              address: toLatin(p.structuredFormat.secondaryText?.text ?? ''),
             },
           ]
         : [],
@@ -395,7 +396,7 @@ export const stayDetails = action({
     );
     return {
       coordinates: place.location,
-      address: place.formattedAddress,
+      address: place.formattedAddress && toLatin(place.formattedAddress),
       phone: place.internationalPhoneNumber,
       website: place.websiteUri,
     };
@@ -483,9 +484,9 @@ function toSuggestedPlace(place: GooglePlace): SuggestedPlace[] {
   return [
     {
       providerPlaceId: place.id,
-      name: place.displayName.text,
+      name: toLatin(place.displayName.text),
       coordinates: place.location,
-      address: place.shortFormattedAddress,
+      address: place.shortFormattedAddress && toLatin(place.shortFormattedAddress),
       photoName: place.photos?.[0]?.name,
       // Already in the answer (places.photos), so the pop-up's photos cost no extra call
       photoNames: (place.photos ?? []).slice(0, MAX_PHOTOS).map((photo) => photo.name),
@@ -634,8 +635,8 @@ type GooglePrediction = NonNullable<
 function toMapSuggestion(prediction: GooglePrediction): MapSearchSuggestion[] {
   const types = prediction.types ?? [];
   const placeId = prediction.placeId;
-  const name = prediction.structuredFormat.mainText.text;
-  const secondary = prediction.structuredFormat.secondaryText?.text ?? '';
+  const name = toLatin(prediction.structuredFormat.mainText.text);
+  const secondary = toLatin(prediction.structuredFormat.secondaryText?.text ?? '');
   if (types.some((type) => CITY_TYPES.includes(type))) {
     return [{ type: 'city', placeId, name, region: secondary }];
   }
@@ -710,9 +711,9 @@ export const placeDetails = action({
     }
     return {
       providerPlaceId: place.id,
-      name: place.displayName.text,
+      name: toLatin(place.displayName.text),
       coordinates: place.location,
-      address: place.formattedAddress,
+      address: place.formattedAddress && toLatin(place.formattedAddress),
       photoName: place.photos?.[0]?.name,
       category: place.primaryTypeDisplayName?.text,
       rating: place.rating,
@@ -729,7 +730,7 @@ export const placeDetails = action({
         review.text?.text
           ? [
               {
-                author: review.authorAttribution?.displayName ?? 'A Google user',
+                author: toLatin(review.authorAttribution?.displayName ?? 'A Google user'),
                 rating: review.rating,
                 text: review.text.text,
                 when: review.relativePublishTimeDescription,
@@ -740,6 +741,11 @@ export const placeDetails = action({
     };
   },
 });
+
+// The language Google answers in. Without it Google prefers English but doesn't promise it.
+// A name or street Google has no English version of still comes back in the local language;
+// toLatin spells the Cyrillic ones in Latin letters.
+const PLACES_LANGUAGE = 'en';
 
 // One call to the Places API. Only signed-in users may call it, because every call costs money.
 async function placesRequest<T>(
@@ -763,14 +769,20 @@ async function placesRequest<T>(
 
   let response: Response;
   try {
-    response = await fetchGoogle(`${PLACES_API}/${path}`, {
+    // GET (place details) takes the language in the URL, POST (searches) in the body
+    const url =
+      method === 'GET'
+        ? `${PLACES_API}/${path}?languageCode=${PLACES_LANGUAGE}`
+        : `${PLACES_API}/${path}`;
+    response = await fetchGoogle(url, {
       method,
       headers: {
         'Content-Type': 'application/json',
         'X-Goog-Api-Key': key,
         ...(fieldMask ? { 'X-Goog-FieldMask': fieldMask } : {}),
       },
-      body: body ? JSON.stringify(body) : undefined,
+      body:
+        method === 'POST' ? JSON.stringify({ ...body, languageCode: PLACES_LANGUAGE }) : undefined,
     });
   } catch (error) {
     // Timed out (see fetchGoogle) or no connection at all

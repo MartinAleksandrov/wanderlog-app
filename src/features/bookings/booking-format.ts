@@ -1,4 +1,5 @@
 import { daysBetween, formatWeekdayDate } from '@/lib/dates';
+import { APP_LOCALE } from '@/lib/locale';
 import type { Doc } from '@convex/_generated/dataModel';
 import type { BookingType, Money, TransportMode } from '@convex/schema';
 import { TRANSPORT_MODES } from './booking-kinds';
@@ -135,11 +136,11 @@ export function nightsLabel(startDate: string, endDate: string): string {
   return nights === 1 ? '1 night' : `${nights} nights`;
 }
 
-// "€125.50" in the phone's language. Intl rejects a code it can't use; then "125.50 XYZ".
+// "€125.50". Intl rejects a code it can't use; then "125.50 XYZ".
 export function formatMoney({ amountCents, currency }: Money): string {
   const amount = amountCents / 100;
   try {
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(amount);
+    return new Intl.NumberFormat(APP_LOCALE, { style: 'currency', currency }).format(amount);
   } catch {
     return `${amount.toFixed(2)} ${currency}`;
   }

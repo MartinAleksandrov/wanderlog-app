@@ -2,6 +2,7 @@ import { PlacePhoto } from '@/components/place-photo';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { formatDistance } from '@/lib/geo';
+import { APP_LOCALE } from '@/lib/locale';
 import { cn } from '@/lib/utils';
 import type { PlaceHours } from '@convex/googlePlaces';
 import type { Coordinates } from '@convex/schema';
@@ -128,7 +129,7 @@ function SaveButton({
 // "Museum · ★ 4.5 (3,721)"
 function KindAndRating({ place }: { place: PlaceInfo }) {
   const rating = place.rating
-    ? `★ ${place.rating.toFixed(1)}${place.ratingCount ? ` (${place.ratingCount.toLocaleString()})` : ''}`
+    ? `★ ${place.rating.toFixed(1)}${place.ratingCount ? ` (${place.ratingCount.toLocaleString(APP_LOCALE)})` : ''}`
     : null;
   const text = [place.category, rating].filter(Boolean).join(' · ');
   if (!text) return null;

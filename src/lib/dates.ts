@@ -1,3 +1,5 @@
+import { APP_LOCALE } from './locale';
+
 // Calendar dates, 'YYYY-MM-DD', as trips and bookings store them (see convex/schema.ts). These
 // helpers convert them to and from the phone's local calendar without going through UTC, so a
 // date never moves by a day because of the time zone. Shared by every feature, so they live
@@ -33,9 +35,9 @@ export function daysBetween(fromIso: string, toIso: string): number {
   return Math.round((fromIsoDate(toIso).getTime() - fromIsoDate(fromIso).getTime()) / DAY_MS);
 }
 
-// "12 Mar 2027", in the phone's language
+// "12 Mar 2027", in English
 export function formatDate(isoDate: string): string {
-  return fromIsoDate(isoDate).toLocaleDateString(undefined, {
+  return fromIsoDate(isoDate).toLocaleDateString(APP_LOCALE, {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
@@ -44,7 +46,7 @@ export function formatDate(isoDate: string): string {
 
 // "12 Mar – 15 Mar 2027"
 export function formatDateRange(startDate: string, endDate: string): string {
-  const start = fromIsoDate(startDate).toLocaleDateString(undefined, {
+  const start = fromIsoDate(startDate).toLocaleDateString(APP_LOCALE, {
     day: 'numeric',
     month: 'short',
   });
@@ -53,7 +55,7 @@ export function formatDateRange(startDate: string, endDate: string): string {
 
 // "Fri, 12 Jun", for a list's day headings (the year is the trip's, so it's left out)
 export function formatWeekdayDate(isoDate: string): string {
-  return fromIsoDate(isoDate).toLocaleDateString(undefined, {
+  return fromIsoDate(isoDate).toLocaleDateString(APP_LOCALE, {
     weekday: 'short',
     day: 'numeric',
     month: 'short',

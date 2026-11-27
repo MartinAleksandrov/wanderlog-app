@@ -3,6 +3,7 @@ import { Separator } from '@/components/ui/separator';
 import { Text } from '@/components/ui/text';
 import { SignOutButton } from '@/features/auth';
 import { TravelSection } from '@/features/journal';
+import { APP_LOCALE } from '@/lib/locale';
 import { useUser } from '@clerk/expo';
 import { api } from '@convex/_generated/api';
 import { useQuery } from 'convex/react';
@@ -54,7 +55,10 @@ export function AccountScreen() {
               label="Member since"
               value={
                 user?.createdAt
-                  ? user.createdAt.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+                  ? user.createdAt.toLocaleDateString(APP_LOCALE, {
+                      month: 'long',
+                      year: 'numeric',
+                    })
                   : '…'
               }
             />
