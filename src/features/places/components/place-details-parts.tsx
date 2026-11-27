@@ -1,6 +1,7 @@
 import { PlacePhoto } from '@/components/place-photo';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
+import { APP_LOCALE } from '@/lib/locale';
 import { openLink } from '@/lib/open-link';
 import { useNow } from '@/lib/use-now';
 import { cn } from '@/lib/utils';
@@ -65,7 +66,7 @@ export function PlaceSummaryLine({ place }: { place: PlaceDetails }) {
           {/* The same solid star as the places list and the reviews */}
           <Text className="text-sm text-orange-500">★</Text> {place.rating.toFixed(1)}
           {place.ratingCount ? (
-            <Text variant="muted"> ({place.ratingCount.toLocaleString()})</Text>
+            <Text variant="muted"> ({place.ratingCount.toLocaleString(APP_LOCALE)})</Text>
           ) : null}
         </Text>
       ) : null}

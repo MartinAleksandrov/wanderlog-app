@@ -4,6 +4,7 @@ import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { errorMessage } from '@/lib/error-message';
 import { formatDistance } from '@/lib/geo';
+import { APP_LOCALE } from '@/lib/locale';
 import { useNow } from '@/lib/use-now';
 import { cn } from '@/lib/utils';
 import { api } from '@convex/_generated/api';
@@ -319,7 +320,9 @@ function RatingText({ rating, ratingCount }: { rating: number; ratingCount?: num
   return (
     <Text className="text-sm font-medium">
       <Text className="text-sm text-orange-500">★</Text> {rating.toFixed(1)}
-      {ratingCount ? <Text variant="muted"> ({ratingCount.toLocaleString()})</Text> : null}
+      {ratingCount ? (
+        <Text variant="muted"> ({ratingCount.toLocaleString(APP_LOCALE)})</Text>
+      ) : null}
     </Text>
   );
 }
