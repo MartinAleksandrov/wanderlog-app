@@ -8,11 +8,15 @@ import { createContext, use, useState, type ReactNode } from 'react';
 import { cityArea } from './map-area';
 import { usePlaceMode } from './place-mode-context';
 import { placeKindOf } from './place-modes';
+import { topSuggestions } from './place-ranking';
 
 // Where to look for places: the rectangle the map showed (centre, width and height in metres),
 // remembered per trip
 export type { SearchArea };
 type TripSearchArea = SearchArea & { tripId: Id<'trips'> };
+
+// A city explored with the map's search bar has no saved places of its own
+const NO_SAVED_IDS: ReadonlySet<string> = new Set();
 
 const SearchAreaContext = createContext<{
   area: TripSearchArea | null;
@@ -33,10 +37,15 @@ export function SearchAreaProvider({ children }: { children: ReactNode }) {
 // TanStack Query caches the answer per area and kind: screens showing the same area share one
 // request, and going back to an earlier area, or switching sides back and forth, doesn't pay
 // Google again while the app is open.
+//
+// The answer has spares: `select` keeps the saved places in it (`savedIds`, Google place IDs)
+// plus the first 30 others (see topSuggestions). It runs on the cached answer, so saving a place
+// brings in the next suggestion without asking Google again.
 export function useNearbyPlaces(
   area: SearchArea | null,
   scope: string | undefined,
   kind: PlaceKind,
+  savedIds: ReadonlySet<string> = NO_SAVED_IDS,
 ) {
   const nearbyPlaces = useAction(api.googlePlaces.nearbyPlaces);
 
@@ -57,6 +66,7 @@ export function useNearbyPlaces(
           return nearbyPlaces({ area: { center, widthMeters, heightMeters }, kind });
         }
       : skipToken,
+    select: (places) => topSuggestions(places, savedIds),
     staleTime: Infinity,
     // While a new area loads, keep showing the previous one's places, but only within the same
     // scope and kind, so switching trips or sides never flashes the other list's places
@@ -80,6 +90,7 @@ export function useTripPlaces() {
   const trip = useQuery(api.trips.active);
   const allSaved = useQuery(api.places.listForTrip, trip ? { tripId: trip._id } : 'skip');
   const saved = allSaved?.filter((place) => placeKindOf(place) === kind);
+  const savedIds = new Set(saved?.flatMap((place) => place.providerPlaceId ?? []));
 
   // The area last searched on the map while it belongs to this trip, otherwise the destination
   const area: SearchArea | null =
@@ -89,7 +100,7 @@ export function useTripPlaces() {
         ? cityArea(trip.destinationCoordinates)
         : null;
 
-  const suggestions = useNearbyPlaces(area, trip?._id, kind);
+  const suggestions = useNearbyPlaces(area, trip?._id, kind, savedIds);
 
   function searchArea(next: SearchArea) {
     if (trip) context?.setArea({ ...next, tripId: trip._id });

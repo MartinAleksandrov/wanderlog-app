@@ -420,12 +420,15 @@ export type SearchArea = Infer<typeof searchArea>;
 
 // Google's Nearby Search returns at most 20 places and has no "next page"
 const PLACES_PER_SEARCH = 20;
-// The most places one search shows: enough to fill the map, few enough to keep it readable
-const MAX_PLACES = 30;
+// The app shows 30 places that aren't saved yet (MAX_SUGGESTIONS in
+// src/features/places/place-ranking.ts). Twice that many go back, so a trip that saved up to 30
+// of them still gets 30 new ones. The four searches find them anyway: they cost nothing extra.
+const MAX_PLACES = 60;
 // Nearby Search takes circles of up to 50 km
 const MAX_RADIUS_METERS = 50_000;
 
-// The most popular places of one kind on the map's rectangle, at most 30, most reviewed first.
+// The most popular places of one kind on the map's rectangle, at most 60, best pick first (the
+// app keeps the first 30 that aren't saved yet).
 //
 // One search (20 places, in a circle) leaves the map half empty: much of the circle is off the
 // screen, and the rating rules (sweet spots, restaurants) drop more. So the rectangle is split
@@ -481,10 +484,9 @@ export const nearbyPlaces = action({
     for (const place of takeInTurn(perQuarter)) {
       if (!unique.has(place.providerPlaceId)) unique.set(place.providerPlaceId, place);
     }
-    // The quarters chose which places to keep; the places list shows them most reviewed first
-    return [...unique.values()]
-      .slice(0, MAX_PLACES)
-      .sort((a, b) => (b.ratingCount ?? 0) - (a.ratingCount ?? 0));
+    // In the order the quarters picked them, so the first 30 the app keeps spread over the map.
+    // The app sorts them itself (see topSuggestions).
+    return [...unique.values()].slice(0, MAX_PLACES);
   },
 });
 
