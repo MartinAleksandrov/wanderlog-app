@@ -36,7 +36,11 @@ export function DragLayer({ drag, isEditing, layerRef, binRef }: DragLayerProps)
             number={drag.target + 1}
             isEditing={isEditing}
           />
-          <Bin binRef={binRef} isOverBin={drag.shared.isOverBin} />
+          <Bin
+            binRef={binRef}
+            isOverBin={drag.shared.isOverBin}
+            isLaidOut={drag.shared.isBinLaidOut}
+          />
         </>
       ) : null}
     </Animated.View>
@@ -89,19 +93,27 @@ function FloatingStop({
 }
 
 // The bin: a red circle at the bottom, above the tab bar. It grows when the finger is on it.
+// Once laid out, it tells the drag it can be measured.
 function Bin({
   binRef,
   isOverBin,
+  isLaidOut,
 }: {
   binRef: AnimatedRef<Animated.View>;
   isOverBin: SharedValue<boolean>;
+  isLaidOut: SharedValue<boolean>;
 }) {
   const style = useAnimatedStyle(() => ({
     transform: [{ scale: withTiming(isOverBin.get() ? 1.25 : 1, HOVER) }],
   }));
   return (
     <View className="absolute inset-x-0 bottom-6 items-center">
-      <Animated.View ref={binRef} entering={ZoomIn.duration(150)} exiting={ZoomOut.duration(150)}>
+      <Animated.View
+        ref={binRef}
+        entering={ZoomIn.duration(150)}
+        exiting={ZoomOut.duration(150)}
+        onLayout={() => isLaidOut.set(true)}
+      >
         <Animated.View
           style={style}
           accessibilityLabel="Drop here to remove from this day"

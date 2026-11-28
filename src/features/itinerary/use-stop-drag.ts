@@ -25,6 +25,10 @@ const EDGE = 72;
 const MAX_SCROLL_STEP = 12;
 // How far around the bin (dp) still counts as on it
 const BIN_SLOP = 24;
+// A stop lifted where the bin or a scrolling edge already is (low on a long day) doesn't trigger
+// it: the finger first has to leave that zone, or move this much further (dp) towards its edge.
+// Otherwise holding a stop and letting go would remove it.
+const ARM_DISTANCE = 24;
 // How long the floating copy takes to settle into its slot, or to shrink into the bin
 const DROP_MS = 160;
 
@@ -76,10 +80,15 @@ export function useStopDrag({ onMove, onRemove }: DropHandlers) {
     slot: useSharedValue(0),
     otherHeights: useSharedValue<number[]>([]),
     isOverBin: useSharedValue(false),
+    // Which zones count yet (see ARM_DISTANCE); none right after the lift
+    armed: useSharedValue({ bin: false, top: false, bottom: false }),
+    // Whether the bin is on the screen and laid out, so it can be measured
+    isBinLaidOut: useSharedValue(false),
     // 0 → 1 while the copy shrinks into the bin
     removing: useSharedValue(0),
   };
-  const { phase, start, translationY, finger, slot, otherHeights, isOverBin } = shared;
+  const { phase, start, translationY, finger, slot, otherHeights, isOverBin, armed } = shared;
+  const { isBinLaidOut } = shared;
 
   // React's side: the stop lifted (for the copy, the bin and the empty slot) and its slot
   const [lifted, setLifted] = useState<Lifted | null>(null);
@@ -107,18 +116,35 @@ export function useStopDrag({ onMove, onRemove }: DropHandlers) {
   const frame = useFrameCallback(() => {
     'worklet';
     if (phase.get() !== 'lifted') return;
+    // The bin is drawn a moment after the lift, and the zones depend on where it is
+    if (!isBinLaidOut.get()) return;
     const list = measure(listRef);
     const scroll = measure(scrollRef);
     if (list === null || scroll === null) return;
     const bin = measure(binRef);
     const { x, y } = finger.get();
+    const moved = translationY.get();
 
     // Anywhere below the bin's top edge, around it, counts
-    const onBin =
+    const inBin =
       bin !== null &&
       x > bin.pageX - BIN_SLOP &&
       x < bin.pageX + bin.width + BIN_SLOP &&
       y > bin.pageY - BIN_SLOP;
+    // Near the top, or just above the bin, the list scrolls that way
+    const top = scroll.pageY + EDGE;
+    const bottom = (bin === null ? scroll.pageY + scroll.height : bin.pageY - BIN_SLOP) - EDGE;
+
+    // A zone the stop was lifted in counts once the finger leaves it or moves on towards its edge
+    const was = armed.get();
+    const now = {
+      bin: was.bin || !inBin || moved > ARM_DISTANCE,
+      top: was.top || y >= top || moved < -ARM_DISTANCE,
+      bottom: was.bottom || y <= bottom || moved > ARM_DISTANCE,
+    };
+    if (now.bin !== was.bin || now.top !== was.top || now.bottom !== was.bottom) armed.set(now);
+
+    const onBin = inBin && now.bin;
     if (onBin !== isOverBin.get()) {
       isOverBin.set(onBin);
       if (onBin) scheduleOnRN(onBinReached);
@@ -126,13 +152,11 @@ export function useStopDrag({ onMove, onRemove }: DropHandlers) {
     // On the bin, the rows stay where they are
     if (onBin) return;
 
-    // Near the top, or just above the bin: scroll that way, faster the closer the finger is
-    const top = scroll.pageY + EDGE;
-    const bottom = (bin === null ? scroll.pageY + scroll.height : bin.pageY - BIN_SLOP) - EDGE;
+    // Faster the closer the finger is to the edge
     const step =
-      y < top
+      y < top && now.top
         ? -MAX_SCROLL_STEP * Math.min(1, (top - y) / EDGE)
-        : y > bottom
+        : y > bottom && now.bottom
           ? MAX_SCROLL_STEP * Math.min(1, (y - bottom) / EDGE)
           : 0;
     if (step !== 0) scrollTo(scrollRef, 0, Math.max(0, scrollOffset.get() + step), false);
@@ -230,6 +254,7 @@ export function useListDragGesture({
 }) {
   const { phase, start, translationY, finger, pressY, slot, otherHeights, isOverBin, removing } =
     drag.shared;
+  const { armed, isBinLaidOut } = drag.shared;
   const { drop } = drag;
 
   return usePanGesture({
@@ -247,6 +272,8 @@ export function useListDragGesture({
       finger.set({ x: event.absoluteX, y: event.absoluteY });
       pressY.set(event.absoluteY);
       isOverBin.set(false);
+      armed.set({ bin: false, top: false, bottom: false });
+      isBinLaidOut.set(false);
       removing.set(0);
       scheduleOnRN(onLift, event.y, {
         top: list.pageY - layer.pageY,
